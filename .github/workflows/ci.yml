@@ -42,11 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -68,7 +68,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -92,8 +92,8 @@ jobs:
       run:
         working-directory: analyzers/go
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: analyzers/go/go.sum
@@ -112,8 +112,8 @@ jobs:
       run:
         working-directory: analyzers/python
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -129,7 +129,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
@@ -149,7 +149,7 @@ jobs:
           cargo llvm-cov report --json --summary-only --output-path coverage.json
           mkdir -p ../coverage-result
           jq -r '.data[0].totals.lines.percent' coverage.json > ../coverage-result/core.txt
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage-core
           path: coverage-result/
@@ -161,11 +161,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -176,7 +176,7 @@ jobs:
         run: |
           mkdir -p coverage-result
           jq -r '.total.lines.pct' coverage/coverage-summary.json > coverage-result/frontend.txt
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage-frontend
           path: coverage-result/
@@ -191,8 +191,8 @@ jobs:
       run:
         working-directory: analyzers/go
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: analyzers/go/go.sum
@@ -203,7 +203,7 @@ jobs:
           go tool cover -func=coverage.out | tail -n 1
           mkdir -p ../../coverage-result
           go tool cover -func=coverage.out | awk '/^total:/ { sub(/%/, "", $NF); print $NF }' > ../../coverage-result/go.txt
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage-go
           path: coverage-result/
@@ -218,15 +218,15 @@ jobs:
       run:
         working-directory: analyzers/python
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: analyzers/python/requirements-dev.txt
       # The analyzer prefers uv when it is on the PATH, as on a developer's
       # machine; the suite is validated with it.
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
       # coverage lives in its own environment: the end-to-end tests run the
@@ -244,7 +244,7 @@ jobs:
         run: |
           mkdir -p ../../coverage-result
           jq -r '.totals.percent_covered' coverage.json > ../../coverage-result/python.txt
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage-python
           path: coverage-result/
@@ -259,12 +259,12 @@ jobs:
       run:
         working-directory: analyzers/jsts
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # pnpm runs the pnpm-workspace fixture.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -289,7 +289,7 @@ jobs:
         run: |
           mkdir -p ../../coverage-result
           awk -F: '/^LF:/ { found += $2 } /^LH:/ { hit += $2 } END { printf "%.2f\n", hit * 100 / found }' lcov.info > ../../coverage-result/jsts.txt
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage-jsts
           path: coverage-result/
@@ -304,7 +304,7 @@ jobs:
       run:
         working-directory: analyzers/rust
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       # clippy: the analyzer's `check` tests run it on fixture crates.
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -325,7 +325,7 @@ jobs:
           cargo llvm-cov report --json --summary-only --output-path coverage.json
           mkdir -p ../../coverage-result
           jq -r '.data[0].totals.lines.percent' coverage.json > ../../coverage-result/rust.txt
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage-rust
           path: coverage-result/
@@ -342,7 +342,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
           path: coverage-result
