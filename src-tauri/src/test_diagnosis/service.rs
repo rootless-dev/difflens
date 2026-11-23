@@ -197,7 +197,7 @@ pub fn diagnoses(session: &ReviewSession<'_>, facts: Facts<'_>) -> AppResult<Vec
         .map(|record| {
             let outdated = now
                 .get(&inputs::key_of(&record.package, &record.test))
-                .map_or(true, |(failure, code)| {
+                .is_none_or(|(failure, code)| {
                     *failure != record.failure_fingerprint || *code != record.code_fingerprint
                 });
             let subject = (record.package.clone(), record.test.clone());

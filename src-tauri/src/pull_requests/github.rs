@@ -414,7 +414,7 @@ impl PullRequestHost for Github {
             .filter(|comment| {
                 comment
                     .pull_request_review_id
-                    .map_or(true, |review| !pending.contains(&review))
+                    .is_none_or(|review| !pending.contains(&review))
             })
             .map(|comment| {
                 let resolved = comment.in_reply_to_id.is_none() && resolved.contains(&comment.id);

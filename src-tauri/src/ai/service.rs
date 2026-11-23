@@ -488,7 +488,7 @@ impl ModelService {
         });
         let cli = (kind == ModelProviderKind::ClaudeCli).then(|| self.claude.status());
         let configured =
-            (!kind.needs_key() || key_saved) && cli.as_ref().map_or(true, |cli| cli.path.is_some());
+            (!kind.needs_key() || key_saved) && cli.as_ref().is_none_or(|cli| cli.path.is_some());
         let ready = model.is_some() && configured;
         Ok(ModelProviderState {
             provider: kind,
