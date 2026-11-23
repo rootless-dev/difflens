@@ -1566,7 +1566,7 @@ mod tests {
     fn the_working_tree_search_is_kept_in_memory_for_its_old_side() {
         let harness = Harness::new();
         let (old, new) = two_commits(&harness);
-        harness.repo.write("d.go", &numbered_lines(6));
+        harness.repo.write("d.go", numbered_lines(6));
 
         harness.report(&new, None);
         harness.report(&new, None);
@@ -1577,7 +1577,7 @@ mod tests {
 
         harness.report(&old, None);
         assert_eq!(calls(harness.tools.path(), "dupes"), 2, "another old side");
-        harness.repo.write("d.go", &numbered_lines(7));
+        harness.repo.write("d.go", numbered_lines(7));
         harness.report(&old, None);
         assert_eq!(calls(harness.tools.path(), "dupes"), 3, "a file changed");
     }

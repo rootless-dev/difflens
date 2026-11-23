@@ -1030,7 +1030,7 @@ mod tests {
     fn a_working_tree_run_is_kept_while_its_files_stay_the_same() {
         let harness = Harness::new();
         let (old, _) = two_commits(&harness, 1);
-        harness.repo.write("bank.go", &BANK.replace("return false", "return !true"));
+        harness.repo.write("bank.go", BANK.replace("return false", "return !true"));
         harness.run_tests(&old, None);
 
         let run = harness.run(&old, None, Isolation::Process).unwrap();

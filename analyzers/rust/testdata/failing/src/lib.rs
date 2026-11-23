@@ -6,7 +6,7 @@ pub fn add(left: u64, right: u64) -> u64 {
 }
 
 pub fn halve(value: u64) -> u64 {
-    if value % 2 == 0 {
+    if value.is_multiple_of(2) {
         value / 2
     } else {
         value / 2 + 1
