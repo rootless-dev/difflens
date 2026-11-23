@@ -1,0 +1,118 @@
+# Dependency audits for every component and a secret scan of the history.
+# Runs on pull requests and pushes, and weekly so that advisories published
+# after the last change still surface.
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+  # Release runs this workflow before publishing a tag.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "26"
+  PNPM_VERSION: "10.20.0"
+  GO_VERSION: "1.26.x"
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  audit-rust:
+    name: Audit / cargo audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: cargo audit (src-tauri)
+        working-directory: src-tauri
+        run: cargo audit
+      - name: cargo audit (analyzers/rust)
+        working-directory: analyzers/rust
+        run: cargo audit
+
+  audit-node:
+    name: Audit / pnpm and npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: pnpm audit --prod (frontend)
+        run: pnpm audit --prod
+      # The JS/TS analyzer ships with its own lockfile and runtime dependencies.
+      - name: npm audit --omit=dev (analyzers/jsts)
+        working-directory: analyzers/jsts
+        run: npm audit --omit=dev
+
+  audit-go:
+    name: Audit / govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: analyzers/go
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: analyzers/go/go.sum
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+          govulncheck ./...
+
+  audit-python:
+    name: Audit / pip-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: analyzers/python
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install pip-audit==2.10.1
+      # requirements.txt (runtime, shipped) is empty today; the development
+      # tools are audited with it.
+      - name: pip-audit
+        run: pip-audit -r requirements.txt -r requirements-dev.txt
+
+  secrets:
+    name: Secrets / gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      # The CLI rather than gitleaks-action, which needs a license key for
+      # repositories owned by an organization.
+      - name: gitleaks (whole history)
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          gitleaks git --redact --verbose .

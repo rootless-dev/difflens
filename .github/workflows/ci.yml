@@ -1,0 +1,389 @@
+# Verify (lint and types), test, and quality (coverage gate) for every
+# component: the core (src-tauri), the frontend (src) and the four analyzers.
+#
+# The test jobs run each suite once, instrumented, and record its line
+# coverage; the quality job gates every component at COVERAGE_THRESHOLD and
+# writes the table to the run summary.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Release runs this workflow before publishing a tag.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # Versions of the toolchains, from the repository: Go follows go.mod's
+  # `go 1.26.0` (latest patch), Node and pnpm the versions development uses,
+  # Python the version the analyzer is developed and tested on.
+  NODE_VERSION: "26"
+  PNPM_VERSION: "10.20.0"
+  GO_VERSION: "1.26.x"
+  PYTHON_VERSION: "3.14"
+  UV_VERSION: "0.12.23"
+  # Line coverage below this fails the run, per component.
+  COVERAGE_THRESHOLD: "70"
+
+jobs:
+  # ---------------------------------------------------------------- verify
+
+  verify-typescript:
+    name: Verify / TypeScript and ESLint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Type-check (tsc -b)
+        run: pnpm exec tsc -b
+      - name: ESLint (analyzers/jsts)
+        run: pnpm exec eslint analyzers/jsts
+      - name: ESLint (frontend)
+        # TODO: make this step blocking once the frontend's 26 react-hooks
+        # findings are fixed (set-state-in-effect 13, refs 7,
+        # preserve-manual-memoization 4, exhaustive-deps 2). They need
+        # component refactors, not mechanical edits.
+        continue-on-error: true
+        run: pnpm exec eslint src vite.config.ts eslint.config.js
+
+  verify-rust:
+    name: Verify / Clippy
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> target
+            analyzers/rust -> target
+      - name: Clippy (src-tauri)
+        working-directory: src-tauri
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Clippy (analyzers/rust)
+        working-directory: analyzers/rust
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+  verify-go:
+    name: Verify / go vet and staticcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: analyzers/go
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: analyzers/go/go.sum
+      - name: go vet
+        run: go vet ./...
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
+          staticcheck ./...
+
+  verify-python:
+    name: Verify / ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: analyzers/python
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: analyzers/python/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: ruff check
+        run: ruff check --output-format=github .
+
+  # ------------------------------------------------------------------ test
+
+  test-core:
+    name: Test / core (src-tauri)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: cargo test (instrumented)
+        working-directory: src-tauri
+        run: cargo llvm-cov --locked --no-report
+      - name: Coverage report
+        working-directory: src-tauri
+        run: |
+          cargo llvm-cov report --summary-only
+          cargo llvm-cov report --json --summary-only --output-path coverage.json
+          mkdir -p ../coverage-result
+          jq -r '.data[0].totals.lines.percent' coverage.json > ../coverage-result/core.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage-core
+          path: coverage-result/
+          retention-days: 7
+          if-no-files-found: error
+
+  test-frontend:
+    name: Test / frontend (vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: vitest (v8 coverage)
+        run: pnpm test:coverage
+      - name: Record line coverage
+        run: |
+          mkdir -p coverage-result
+          jq -r '.total.lines.pct' coverage/coverage-summary.json > coverage-result/frontend.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage-frontend
+          path: coverage-result/
+          retention-days: 7
+          if-no-files-found: error
+
+  test-go:
+    name: Test / Go analyzer
+    runs-on: macos-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: analyzers/go
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: analyzers/go/go.sum
+      - name: go test (coverage)
+        run: go test -coverpkg=./... -coverprofile=coverage.out ./...
+      - name: Record statement coverage
+        run: |
+          go tool cover -func=coverage.out | tail -n 1
+          mkdir -p ../../coverage-result
+          go tool cover -func=coverage.out | awk '/^total:/ { sub(/%/, "", $NF); print $NF }' > ../../coverage-result/go.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage-go
+          path: coverage-result/
+          retention-days: 7
+          if-no-files-found: error
+
+  test-python:
+    name: Test / Python analyzer
+    runs-on: macos-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: analyzers/python
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: analyzers/python/requirements-dev.txt
+      # The analyzer prefers uv when it is on the PATH, as on a developer's
+      # machine; the suite is validated with it.
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+      # coverage lives in its own environment: the end-to-end tests run the
+      # python3 on the PATH as a project's interpreter, which must stay clean.
+      - name: Install the coverage tool
+        run: |
+          python -m venv "$RUNNER_TEMP/tools"
+          "$RUNNER_TEMP/tools/bin/pip" install -r requirements-dev.txt
+      - name: unittest (coverage)
+        run: |
+          "$RUNNER_TEMP/tools/bin/python" -m coverage run --source=difflens_analyzer -m unittest discover -s tests -t .
+          "$RUNNER_TEMP/tools/bin/python" -m coverage report
+          "$RUNNER_TEMP/tools/bin/python" -m coverage json -o coverage.json
+      - name: Record line coverage
+        run: |
+          mkdir -p ../../coverage-result
+          jq -r '.totals.percent_covered' coverage.json > ../../coverage-result/python.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage-python
+          path: coverage-result/
+          retention-days: 7
+          if-no-files-found: error
+
+  test-jsts:
+    name: Test / JS/TS analyzer
+    runs-on: macos-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: analyzers/jsts
+    steps:
+      - uses: actions/checkout@v5
+      # pnpm runs the pnpm-workspace fixture.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            analyzers/jsts/package-lock.json
+            analyzers/jsts/testdata/*/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      # The fixtures' dependencies, as in README.md (Testing it).
+      - name: Install fixture dependencies
+        run: |
+          for d in testdata/*/; do
+            if [ -f "$d/package-lock.json" ]; then (cd "$d" && npm ci --ignore-scripts --no-audit --no-fund); fi
+            if [ -f "$d/pnpm-lock.yaml" ]; then (cd "$d" && pnpm install --frozen-lockfile --ignore-scripts); fi
+          done
+      - name: node --test (coverage)
+        run: >-
+          node --test --experimental-test-coverage --test-coverage-include='src/**'
+          --test-reporter=spec --test-reporter-destination=stdout
+          --test-reporter=lcov --test-reporter-destination=lcov.info
+          test/*.test.js
+      - name: Record line coverage
+        run: |
+          mkdir -p ../../coverage-result
+          awk -F: '/^LF:/ { found += $2 } /^LH:/ { hit += $2 } END { printf "%.2f\n", hit * 100 / found }' lcov.info > ../../coverage-result/jsts.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage-jsts
+          path: coverage-result/
+          retention-days: 7
+          if-no-files-found: error
+
+  test-rust-analyzer:
+    name: Test / Rust analyzer
+    runs-on: macos-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: analyzers/rust
+    steps:
+      - uses: actions/checkout@v5
+      # clippy: the analyzer's `check` tests run it on fixture crates.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: analyzers/rust -> target
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      # --no-rustc-wrapper: the tests run cargo on fixture crates, and the
+      # RUSTC_WRAPPER cargo-llvm-cov sets would leak into those builds.
+      - name: cargo test (instrumented)
+        run: cargo llvm-cov --no-rustc-wrapper --locked --no-report
+      - name: Coverage report
+        run: |
+          cargo llvm-cov report --summary-only
+          cargo llvm-cov report --json --summary-only --output-path coverage.json
+          mkdir -p ../../coverage-result
+          jq -r '.data[0].totals.lines.percent' coverage.json > ../../coverage-result/rust.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coverage-rust
+          path: coverage-result/
+          retention-days: 7
+          if-no-files-found: error
+
+  # --------------------------------------------------------------- quality
+
+  quality:
+    name: Quality / coverage gate
+    needs: [test-core, test-frontend, test-go, test-python, test-jsts, test-rust-analyzer]
+    # Report what was measured even when a suite failed.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: coverage-*
+          path: coverage-result
+          merge-multiple: true
+      - name: Gate line coverage per component
+        run: |
+          status=0
+          {
+            echo "## Line coverage"
+            echo
+            echo "| Component | Lines | Gate (${COVERAGE_THRESHOLD}%) |"
+            echo "| --- | ---: | :---: |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for entry in \
+            "core:Core (src-tauri)" \
+            "frontend:Frontend (src)" \
+            "go:Go analyzer" \
+            "python:Python analyzer" \
+            "jsts:JS/TS analyzer" \
+            "rust:Rust analyzer"; do
+            id="${entry%%:*}"
+            label="${entry#*:}"
+            file="coverage-result/$id.txt"
+            if [ ! -s "$file" ]; then
+              echo "::error::$label: no coverage was recorded (its test job failed or was skipped)"
+              echo "| $label | not measured | fail |" >> "$GITHUB_STEP_SUMMARY"
+              status=1
+              continue
+            fi
+            pct="$(tr -d '[:space:]' < "$file")"
+            if awk -v p="$pct" -v t="$COVERAGE_THRESHOLD" 'BEGIN { exit !(p + 0 >= t + 0) }'; then
+              result="pass"
+            else
+              result="fail"
+              status=1
+              echo "::error::$label line coverage is ${pct}%, below ${COVERAGE_THRESHOLD}%"
+            fi
+            printf '| %s | %.2f%% | %s |\n' "$label" "$pct" "$result" >> "$GITHUB_STEP_SUMMARY"
+          done
+          {
+            echo
+            echo "Go reports statements, Python (coverage.py) executable lines; the others report lines."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"

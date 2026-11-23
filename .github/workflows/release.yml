@@ -1,0 +1,203 @@
+# Build, package and release the macOS app.
+#
+# - build:   the Go sidecar and `tauri build` (the .app, ad-hoc signed) per target
+# - package: a .dmg per target
+# - release: on tags v*, after CI and Security pass on the tag, a GitHub
+#            Release with both .dmg files and notes
+#
+# Pushes to main build and package too (macOS runners are free for public
+# repositories); their disk images are kept as workflow artifacts.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  # A newer push to main supersedes a build in progress; a tag never does.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: "26"
+  PNPM_VERSION: "10.20.0"
+  GO_VERSION: "1.26.x"
+
+jobs:
+  ci:
+    name: CI
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/ci.yml
+
+  security:
+    name: Security
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/security.yml
+
+  build:
+    name: Build / ${{ matrix.target }}
+    runs-on: macos-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            goarch: arm64
+          - target: x86_64-apple-darwin
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: analyzers/go/go.sum
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+      - run: pnpm install --frozen-lockfile
+      # `pnpm analyzers:build` builds for the host only; the sidecar of each
+      # target is named after its triple (bundle.externalBin).
+      - name: Build the Go analyzer sidecar
+        working-directory: analyzers/go
+        env:
+          CGO_ENABLED: "0"
+          GOOS: darwin
+          GOARCH: ${{ matrix.goarch }}
+        run: >-
+          go build -trimpath
+          -o "../../src-tauri/binaries/difflens-analyzer-go-${{ matrix.target }}"
+          ./cmd/difflens-analyzer-go
+      # Ad-hoc signed (bundle.macOS.signingIdentity "-" in tauri.conf.json):
+      # there is no Developer ID, and arm64 code must carry a signature to run.
+      # The sidecar is already built, so the build step only builds the frontend.
+      - name: tauri build
+        run: >-
+          pnpm tauri build --ci
+          --target ${{ matrix.target }}
+          --bundles app
+          --config '{"build":{"beforeBuildCommand":"pnpm build"}}'
+      - name: Check the signature and archive the app
+        working-directory: src-tauri/target/${{ matrix.target }}/release/bundle/macos
+        run: |
+          codesign --verify --deep --strict --verbose=2 DiffLens.app
+          codesign --display --verbose=2 DiffLens.app 2>&1 | grep -E '^(Identifier|Signature|Format)='
+          # ditto keeps the bundle's symlinks, permissions and signature.
+          ditto -c -k --sequesterRsrc --keepParent DiffLens.app "$RUNNER_TEMP/DiffLens.app.zip"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: DiffLens-${{ matrix.target }}-app
+          path: ${{ runner.temp }}/DiffLens.app.zip
+          retention-days: 7
+          if-no-files-found: error
+
+  package:
+    name: Package / ${{ matrix.target }}
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: aarch64
+          - target: x86_64-apple-darwin
+            arch: x64
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: src-tauri/tauri.conf.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/download-artifact@v5
+        with:
+          name: DiffLens-${{ matrix.target }}-app
+          path: ${{ runner.temp }}/app
+      - name: Create the disk image
+        run: |
+          version="$(jq -r .version src-tauri/tauri.conf.json)"
+          dmg="DiffLens_${version}_${{ matrix.arch }}.dmg"
+          staging="$RUNNER_TEMP/staging"
+          mkdir -p "$staging"
+          ditto -x -k "$RUNNER_TEMP/app/DiffLens.app.zip" "$staging"
+          codesign --verify --deep --strict "$staging/DiffLens.app"
+          ln -s /Applications "$staging/Applications"
+          mkdir -p out
+          hdiutil create -volname DiffLens -srcfolder "$staging" -fs HFS+ -format UDZO -ov "out/$dmg"
+          hdiutil verify "out/$dmg"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: DiffLens-${{ matrix.target }}-dmg
+          path: out/*.dmg
+          retention-days: 30
+          if-no-files-found: error
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [ci, security, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # Creating a release and uploading its assets.
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The previous tag and the commits since it.
+          fetch-depth: 0
+      - name: Check the tag against the app version
+        run: |
+          version="$(jq -r .version src-tauri/tauri.conf.json)"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in src-tauri/tauri.conf.json"
+            exit 1
+          fi
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: DiffLens-*-dmg
+          path: release
+          merge-multiple: true
+      - name: Write the release notes
+        run: |
+          tag="$GITHUB_REF_NAME"
+          previous="$(git describe --tags --abbrev=0 --match 'v*' "$tag^" 2>/dev/null || true)"
+          {
+            echo "## Changes"
+            echo
+            if [ -n "$previous" ]; then
+              echo "Since $previous:"
+              echo
+              git log --no-merges --pretty='- %s (%h)' "$previous..$tag"
+            else
+              git log --no-merges --pretty='- %s (%h)' "$tag"
+            fi
+            echo
+            cat .github/release/unsigned-app.md
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" release/*.dmg
+          --verify-tag
+          --title "DiffLens $GITHUB_REF_NAME"
+          --notes-file "$RUNNER_TEMP/notes.md"

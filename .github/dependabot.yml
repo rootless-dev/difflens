@@ -1,0 +1,55 @@
+# Weekly dependency updates. Minor and patch updates of each ecosystem come
+# grouped in one pull request; major updates come one by one.
+# The analyzers' testdata/ fixture projects are not listed: their versions are
+# what the tests expect.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /analyzers/jsts
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # TypeScript 7 drops the JS API that the JS/TS analyzer and
+      # typescript-eslint use (hence the typescript6 alias at the root).
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: cargo
+    directories:
+      - /src-tauri
+      - /analyzers/rust
+    schedule:
+      interval: weekly
+    groups:
+      cargo-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: gomod
+    directory: /analyzers/go
+    schedule:
+      interval: weekly
+    groups:
+      gomod-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /analyzers/python
+    schedule:
+      interval: weekly
+    groups:
+      pip-minor-and-patch:
+        update-types: [minor, patch]
