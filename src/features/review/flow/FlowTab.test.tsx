@@ -173,7 +173,11 @@ describe("Flow tab", () => {
 
     expect(tab("Overview")).toHaveAttribute("aria-selected", "true");
     expect(tab("Flow")).not.toHaveAttribute("aria-disabled", "true");
-    expect(getFlow).toHaveBeenCalledExactlyOnceWith("p-1", "a1b2c3d4e5f6a7b8", "e7f3b10c9d8e7f6a", DEFAULTS);
+    // The flow is asked for by an effect of the render that shows the files, which React may run after the files are
+    // on screen: wait for the call rather than expect it at once.
+    await vi.waitFor(() =>
+      expect(getFlow).toHaveBeenCalledExactlyOnceWith("p-1", "a1b2c3d4e5f6a7b8", "e7f3b10c9d8e7f6a", DEFAULTS),
+    );
 
     await user.click(tab("Flow"));
 

@@ -323,6 +323,9 @@ describe("a full analysis of a review", () => {
     renderReview();
     await screen.findByRole("log");
     await changedFilesRead();
+    // The overview is first read by an effect that may run after the files are on screen; counted before it, its
+    // first read would pass for the read again below.
+    await waitFor(() => expect(getOverview).toHaveBeenCalled());
     const reads = vi.mocked(getOverview).mock.calls.length;
 
     const { log: _log, ...summary } = job;

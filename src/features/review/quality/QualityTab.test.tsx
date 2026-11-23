@@ -139,7 +139,11 @@ describe("Quality tab", () => {
     await changedFilesRead();
 
     expect(tab(/^Overview/)).toHaveAttribute("aria-selected", "true");
-    expect(getQuality).toHaveBeenCalledExactlyOnceWith("p-1", "a1b2c3d4e5f6a7b8", "e7f3b10c9d8e7f6a");
+    // The report is asked for by an effect of the render that shows the files, which React may run after the files
+    // are on screen: wait for the call rather than expect it at once.
+    await vi.waitFor(() =>
+      expect(getQuality).toHaveBeenCalledExactlyOnceWith("p-1", "a1b2c3d4e5f6a7b8", "e7f3b10c9d8e7f6a"),
+    );
     await vi.waitFor(() => expect(tab(/^Quality/)).toHaveAccessibleName("Quality, 4 limits crossed"));
     expect(tab(/^Quality/)).toHaveTextContent(/^Quality4/);
 
