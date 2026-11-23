@@ -1060,11 +1060,13 @@ mod tests {
         let harness = harness(4096);
         let (session, output) = harness.open(TerminalKind::Shell);
 
+        // The shell works out the last line, so the echo of the typed command
+        // cannot pass for it; the prompt after it means nothing more comes.
         harness.type_line(
             &session.id,
-            "i=0; while [ $i -lt 400 ]; do echo line-$i-of-output; i=$((i+1)); done; echo done-printing",
+            "i=0; while [ $i -lt 400 ]; do echo line-$i-of-output; i=$((i+1)); done; echo done-$((40+2))",
         );
-        wait_until("the loop", || output.text().contains("done-printing\r\n"));
+        wait_until("the loop", || output.text().contains("\ndone-42\r\n$ "));
 
         let late = Arc::new(Recorder::default());
         harness
