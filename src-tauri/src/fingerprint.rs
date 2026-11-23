@@ -86,5 +86,10 @@ mod tests {
         assert_eq!(of_lines("a\r\nb\r\n", 1, 2), of_lines("a\nb\n", 1, 2));
         // A span past the end hashes what is there.
         assert_eq!(of_lines("a\nb\n", 2, 9), of_lines("b\n", 1, 1));
+        // The SHA-256 of "abc\n", so stored function fingerprints stay valid.
+        assert_eq!(
+            of_lines("abc\r\ndef\n", 1, 1),
+            "sha256:edeaaff3f1774ad2888673770c6d64097e391bc362d7d6fb34982ddf0efd18cb"
+        );
     }
 }

@@ -1113,6 +1113,19 @@ fi"#
     }
 
     #[test]
+    fn the_fingerprint_of_a_known_tree_is_pinned() {
+        // SHA-256 of "a.txt", a NUL, the length 2 as a big-endian u64 and
+        // "hi": prepared environments are keyed by it, so it must not change
+        // with the hashing crate.
+        let root = TempDir::new().unwrap();
+        write_tree(root.path(), &[("a.txt", "hi")]);
+        assert_eq!(
+            source_fingerprint(root.path()).unwrap(),
+            "78a424e84024d4146fdace4d20f276f4bd45a8ff2cb3b584d373a2eb70c201ce"
+        );
+    }
+
+    #[test]
     fn the_copy_leaves_out_what_the_fingerprint_does() {
         let source = TempDir::new().unwrap();
         write_tree(
