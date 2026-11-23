@@ -4,6 +4,7 @@
 .claude/
 node_modules/
 dist/
+coverage/
 target/
 src-tauri/gen/
 src-tauri/binaries/difflens-analyzer-*

@@ -81,24 +81,26 @@ def analyze_tree(root: str, timeout: float, log: Logger) -> dict[str, Any]:
         except RecursionError:
             skipped.add(what)
 
+    # guarded calls its step before returning, so the lambdas below never
+    # outlive the loop iteration whose variables they read (B023).
     for module in model.modules.values():
         mains = [f for f in module.functions if f.kind == "main"]
         whole = any(f.node is module.tree for f in mains)
         if not whole:
             walker = Walker(model, emitter, detector, None, Scope(module, None, None))
-            guarded(module.source.rel, lambda: walker.run(module.tree.body, skip=[f.node for f in mains]))
+            guarded(module.source.rel, lambda: walker.run(module.tree.body, skip=[f.node for f in mains]))  # noqa: B023
     for f in model.functions:
         if time.monotonic() > deadline:
             stopped = True
             break
         walker = Walker(model, emitter, detector, f, f.scope())
-        guarded(f.module.source.rel, lambda: walker.run(f.body))
+        guarded(f.module.source.rel, lambda: walker.run(f.body))  # noqa: B023
     if not stopped:
         for f in model.functions:
             if time.monotonic() > deadline:
                 stopped = True
                 break
-            guarded(f.module.source.rel, lambda: references(model, emitter, f, detector.registered))
+            guarded(f.module.source.rel, lambda: references(model, emitter, f, detector.registered))  # noqa: B023
     guarded("entry points", detector.finish)
     diagnostics = list(model.diagnostics)
     for rel in sorted(skipped):

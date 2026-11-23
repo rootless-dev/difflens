@@ -192,7 +192,7 @@ class Pairs(unittest.TestCase):
     def test_the_sides_of_a_pair_never_overlap(self):
         step = "x = f(a, b, c, d, e)\n"
         found, files = self.files([("new.py", step * 40, [(1, 40)])], 30)
-        for a, first_a, last_a, b, first_b, last_b in found.pairs(float("inf")):
+        for a, _first_a, last_a, b, first_b, _last_b in found.pairs(float("inf")):
             self.assertIs(a, b)
             self.assertLess(last_a, first_b)
 

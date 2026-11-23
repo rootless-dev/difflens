@@ -30,6 +30,9 @@
     "active": true,
     "targets": "all",
     "externalBin": ["binaries/difflens-analyzer-go"],
+    "macOS": {
+      "signingIdentity": "-"
+    },
     "resources": {
       "../analyzers/python/requirements.txt": "analyzers/python/requirements.txt",
       "../analyzers/python/difflens_analyzer/": "analyzers/python/difflens_analyzer/",

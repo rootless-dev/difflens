@@ -36,7 +36,7 @@ export function cli(args, options = {}) {
     env: { ...process.env, PATH, DIFFLENS_LOG_LEVEL: "error", ...(options.env ?? {}) },
     cwd: options.cwd,
   });
-  let json = null;
+  let json;
   try {
     json = JSON.parse(result.stdout);
   } catch {

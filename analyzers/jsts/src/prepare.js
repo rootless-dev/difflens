@@ -27,7 +27,7 @@ import { keepEnd, run, which } from "./process.js";
 export function installRoots(root) {
   if (existsSync(join(root, "package.json"))) return [root];
   const out = [];
-  let entries = [];
+  let entries;
   try {
     entries = readdirSync(root, { withFileTypes: true });
   } catch {

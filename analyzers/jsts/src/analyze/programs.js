@@ -147,8 +147,8 @@ export function exportTargets(exportsField, subpath = ".") {
 
 /** Resolves `specifier` (a workspace package or one of its subpaths) to a source file of the tree, or null. */
 function resolveWorkspace(specifier, packages) {
-  let name = specifier;
-  let sub = "";
+  let name;
+  let sub;
   const parts = specifier.split("/");
   if (specifier.startsWith("@") && parts.length >= 2) {
     name = parts.slice(0, 2).join("/");

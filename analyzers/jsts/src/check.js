@@ -222,7 +222,7 @@ export function eslintFolders(root) {
   const top = has(root);
   if (top) return [top];
   const candidates = new Set(workspaceFolders(root, readJson(join(root, "package.json")) ?? {}));
-  let entries = [];
+  let entries;
   try {
     entries = readdirSync(root, { withFileTypes: true });
   } catch {

@@ -31,5 +31,14 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test/setup.ts"],
     css: false,
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      // Test fixtures and helpers are not the code under test.
+      exclude: ["src/test/**", "src/**/*.test.{ts,tsx}"],
+      reporter: ["text-summary", "json-summary"],
+      // CI reads coverage/coverage-summary.json and fails below 70% of lines.
+      reportsDirectory: "coverage",
+    },
   },
 });

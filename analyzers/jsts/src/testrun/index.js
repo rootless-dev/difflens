@@ -280,7 +280,7 @@ function nodePatterns(unit, tree) {
   const out = [];
   for (const pattern of unit.patterns) {
     const abs = join(unit.dir, pattern);
-    let folder = false;
+    let folder;
     try {
       folder = statSync(abs).isDirectory();
     } catch {

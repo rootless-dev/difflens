@@ -29,7 +29,7 @@ export function initI18n(language: AppLanguage): void {
       interpolation: { escapeValue: false },
       returnNull: false,
     });
-    usePluralForZeroInPortuguese();
+    applyPluralForZeroInPortuguese();
   }
   setLanguage(language);
 }
@@ -53,7 +53,7 @@ export function currentLanguage(): AppLanguage {
  * Brazilian Portuguese counts zero in the plural ("0 arquivos"), while the CLDR rule Intl follows puts 0 with 1. The
  * rule i18next takes from Intl is wrapped so 0 picks the "other" form; every other count is left to Intl.
  */
-function usePluralForZeroInPortuguese(): void {
+function applyPluralForZeroInPortuguese(): void {
   const resolver = i18n.services.pluralResolver as {
     getRule: (code: string, options?: { ordinal?: boolean }) => Intl.PluralRules | undefined;
   };

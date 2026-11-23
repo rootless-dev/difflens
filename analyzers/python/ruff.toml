@@ -1,0 +1,12 @@
+# Lint configuration for the analyzer's own code (CI runs `ruff check`).
+# Not shipped: only requirements.txt and difflens_analyzer/ are bundled.
+
+# The analyzer supports Python 3.9 and later (see README.md).
+target-version = "py39"
+
+# Fixture projects hold findings on purpose: the analyzer's `check` reports them.
+extend-exclude = ["testdata"]
+
+[lint]
+# pycodestyle errors and warnings, Pyflakes, and flake8-bugbear.
+select = ["E4", "E7", "E9", "F", "W", "B"]

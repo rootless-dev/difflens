@@ -1,0 +1,4 @@
+# Development tools of the analyzer itself (lint and coverage in CI), never
+# shipped or installed for users. Runtime dependencies are in requirements.txt.
+coverage==7.17.5
+ruff==0.17.6

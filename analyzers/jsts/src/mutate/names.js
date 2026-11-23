@@ -51,7 +51,7 @@ export class TestNames {
   /** The tests of a file, parsed once; [] when it cannot be read. */
   titlesOf(file) {
     if (!this.files.has(file)) {
-      let tests = [];
+      let tests;
       try {
         tests = testTitles(this.tree.rel(file) ?? file, readFileSync(file, "utf8"));
       } catch {

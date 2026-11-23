@@ -17,7 +17,7 @@ export function CodeLines({ lines, label, className }: { lines: readonly CodeLin
     >
       {lines.map((line) => (
         <div key={line.line} data-cited={line.marked || undefined} className={cn("px-3", line.marked && "bg-del-bg")}>
-          {`${String(line.line).padStart(width)}  ${line.text}` || " "}
+          {`${String(line.line).padStart(width)}  ${line.text}`}
         </div>
       ))}
     </pre>

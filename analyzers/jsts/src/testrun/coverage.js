@@ -89,7 +89,7 @@ export class Coverage {
     for (const f of files ?? []) {
       const rel = this.ownFile(f.path);
       if (rel === null) continue;
-      let source = [];
+      let source;
       try {
         source = readFileSync(this.tree.abs(rel), "utf8").split(/\r?\n/);
       } catch {

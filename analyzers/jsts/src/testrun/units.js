@@ -69,7 +69,7 @@ export function runnerOfScript(script) {
 export function runnerOf(dir, pkg, testFiles) {
   const script = runnerOfScript(pkg.scripts?.test);
   if (script) return { ...script, how: "the test script" };
-  let entries = [];
+  let entries;
   try {
     entries = readdirSync(dir);
   } catch {
@@ -83,7 +83,7 @@ export function runnerOf(dir, pkg, testFiles) {
   const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
   for (const runner of ["vitest", "jest", "mocha"]) if (deps[runner]) return { runner, how: "its dependencies" };
   for (const file of testFiles) {
-    let text = "";
+    let text;
     try {
       text = readFileSync(file, "utf8");
     } catch {
@@ -118,7 +118,7 @@ export function workspaceFolders(root, pkg) {
       }
       const part = parts[i];
       if (part === "*" || part === "**") {
-        let entries = [];
+        let entries;
         try {
           entries = readdirSync(dir, { withFileTypes: true });
         } catch {
@@ -156,7 +156,7 @@ export function findUnits(root, files) {
     for (const dir of workspaceFolders(root, rootPkg)) candidates.push(dir);
     if (own && !delegates(rootPkg.scripts?.test)) candidates.push(root);
   }
-  let entries = [];
+  let entries;
   try {
     entries = readdirSync(root, { withFileTypes: true });
   } catch {

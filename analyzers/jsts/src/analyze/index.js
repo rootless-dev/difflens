@@ -67,7 +67,7 @@ export function analyzeTree(dir, { log, deadline = Infinity } = {}) {
       index.byId.set(record.id, record);
       index.byKey.set(record.key, record);
     }
-    let syntax = [];
+    let syntax;
     try {
       syntax = program.getSyntacticDiagnostics(sf);
     } catch {
