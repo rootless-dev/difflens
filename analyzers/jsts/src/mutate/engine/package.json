@@ -1,0 +1,12 @@
+{
+  "name": "difflens-analyzer-jsts-mutation-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The mutation engine `mutate` drives, installed by `prepare --tools <folder>` into <folder>/stryker; never a dependency of the analyzer itself",
+  "dependencies": {
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/jest-runner": "10.1.1",
+    "@stryker-mutator/mocha-runner": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1"
+  }
+}

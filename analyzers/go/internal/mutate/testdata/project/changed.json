@@ -1,0 +1,10 @@
+{
+  "protocol": 1,
+  "files": [
+    {"path": "bank/bank.go", "added": [[12, 24]]},
+    {"path": "calc/calc.go", "added": [[4, 15], [27, 40]]},
+    {"path": "calc/calc_test.go", "added": [[8, 12]]},
+    {"path": "broken/broken.go", "added": [[4, 6]]},
+    {"path": "notests/notests.go", "added": [[6, 8]]}
+  ]
+}

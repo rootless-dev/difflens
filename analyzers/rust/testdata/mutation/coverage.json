@@ -1,0 +1,9 @@
+{
+  "protocol": 1,
+  "blocks": [
+    { "file": "src/lib.rs", "startLine": 10, "endLine": 16, "statements": 7, "count": 2 },
+    { "file": "src/lib.rs", "startLine": 20, "endLine": 22, "statements": 3, "count": 2 },
+    { "file": "src/lib.rs", "startLine": 25, "endLine": 31, "statements": 7, "count": 2 },
+    { "file": "src/lib.rs", "startLine": 34, "endLine": 36, "statements": 3, "count": 0 }
+  ]
+}

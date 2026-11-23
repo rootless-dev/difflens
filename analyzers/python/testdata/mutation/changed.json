@@ -1,0 +1,7 @@
+{
+  "protocol": 1,
+  "files": [
+    { "path": "bank/account.py", "added": [[1, 29]] },
+    { "path": "tests/test_account.py", "added": [[1, 21]] }
+  ]
+}

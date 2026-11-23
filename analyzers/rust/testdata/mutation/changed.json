@@ -1,0 +1,7 @@
+{
+  "protocol": 1,
+  "files": [
+    { "path": "src/lib.rs", "added": [[1, 62]] },
+    { "path": "README.md", "added": [[1, 2]] }
+  ]
+}

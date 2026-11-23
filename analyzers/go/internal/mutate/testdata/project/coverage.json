@@ -1,0 +1,23 @@
+{
+  "protocol": 1,
+  "blocks": [
+    {"file": "bank/bank.go", "startLine": 12, "endLine": 13, "statements": 1, "count": 2},
+    {"file": "bank/bank.go", "startLine": 13, "endLine": 17, "statements": 3, "count": 1},
+    {"file": "bank/bank.go", "startLine": 18, "endLine": 19, "statements": 2, "count": 1},
+    {"file": "bank/bank.go", "startLine": 22, "endLine": 24, "statements": 1, "count": 1},
+    {"file": "calc/calc.go", "startLine": 4, "endLine": 6, "statements": 2, "count": 1},
+    {"file": "calc/calc.go", "startLine": 6, "endLine": 8, "statements": 1, "count": 3},
+    {"file": "calc/calc.go", "startLine": 9, "endLine": 9, "statements": 1, "count": 1},
+    {"file": "calc/calc.go", "startLine": 13, "endLine": 14, "statements": 1, "count": 1},
+    {"file": "calc/calc.go", "startLine": 14, "endLine": 14, "statements": 1, "count": 2},
+    {"file": "calc/calc.go", "startLine": 18, "endLine": 23, "statements": 3, "count": 1},
+    {"file": "calc/calc.go", "startLine": 27, "endLine": 28, "statements": 1, "count": 2},
+    {"file": "calc/calc.go", "startLine": 28, "endLine": 30, "statements": 1, "count": 1},
+    {"file": "calc/calc.go", "startLine": 31, "endLine": 31, "statements": 1, "count": 1},
+    {"file": "calc/calc.go", "startLine": 35, "endLine": 36, "statements": 1, "count": 0},
+    {"file": "calc/calc.go", "startLine": 36, "endLine": 38, "statements": 1, "count": 0},
+    {"file": "calc/calc.go", "startLine": 39, "endLine": 39, "statements": 1, "count": 0},
+    {"file": "broken/broken.go", "startLine": 4, "endLine": 6, "statements": 1, "count": 1},
+    {"file": "notests/notests.go", "startLine": 6, "endLine": 8, "statements": 1, "count": 1}
+  ]
+}

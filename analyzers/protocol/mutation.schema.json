@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://difflens.dev/analyzers/protocol/mutation.schema.json",
+  "title": "DiffLens language analyzer mutation testing output, protocol version 1",
+  "description": "`<analyzer> mutate --dir <tree> --timeout <duration> --changed <file> --coverage <file> [--cache-dir <folder>] [--tools <folder>] [--max-mutants 200] [--jobs <n>] [--min-mutant-timeout 10s] [--progress <file>] [--offline]` (--changed: the lines the review adds, a file matching dupes.schema.json $defs/changed; --coverage: a file matching $defs/coverage) finds the lines a review adds that the tests execute but do not verify. It changes one small piece of such a line at a time (a mutant: `>=` into `>`, `+` into `-`, a condition negated, a zero value returned, a call statement dropped), runs the tests that can see it, and reports whether one of them failed (the mutant is killed) or none did (it survived). It prints exactly one JSON document matching this schema on stdout, exiting 0 whenever it could report (surviving mutants are not a failed run). Logs go to stderr; a non-zero exit means the analyzer itself failed (1), or the command line or an input file is wrong (2). The core only asks for it on a click, never as part of an analysis.\n\nThe run: --dir is a throwaway copy of the new side that `prepare` (tests.schema.json) already ran on, so the dependencies are there; the analyzer may write anything inside it. It runs under the same isolation as `test`: with --offline there is no network (as `test --offline`), and writes outside --dir go only to --cache-dir, TMPDIR and the folders `prepare` reported. --cache-dir is the same per-project folder `test` gets: the build output worth keeping (for Rust: CARGO_TARGET_DIR) and the mutation results kept between runs (below). --tools is the folder where `prepare --tools <folder>` installed the analyzer's mutation engine, when it needs one (Rust: cargo-mutants; JS/TS: StrykerJS); `prepare --tools` runs as a plain process with the network, installs pinned versions only when they are missing (idempotent, safe to run for two projects at once: install into a temporary folder inside <folder> and rename it into place), executes no project code, and prints the usual prepare document. Analyzers that need no engine (Go, Python) accept and ignore the flag. --timeout bounds the whole command: when it runs out, the mutants not tested yet are left out, and a diagnostic says how many.\n\nWhich mutants, so the languages agree:\n1. Lines: a line is a candidate when --changed lists it as added and the --coverage blocks say it ran (a block spanning it has count > 0). A mutation point is on a candidate line when its first character is. Lines that are not candidates are never mutated (uncovered ones are already shown as untested).\n2. Operators (`operator`): relational_boundary (`<` and `<=`, `>` and `>=` into each other), relational_negation (`==` and `!=` into each other; `<` into `>=`, `>` into `<=` and back; Python `in`/`not in`, `is`/`is not`), arithmetic (`+` and `-`, `*` and `/`, `%` into `*` ; on numbers only when the language's types say so, else a mutant that does not compile is an error), logical (`&&` and `||`, Python `and` and `or`, into each other), negation_removal (`!x` into `x`, Python `not x` into `x`, and a whole `if`/`while` condition `c` into its negation), return_value (the returned expression into the type's zero value: 0, \"\", false, nil/None/null/undefined, Default::default(), an empty collection), call_removal (an expression statement that is only a call, removed), increment (`++` and `--`, `+=` and `-=` into each other). An engine with other operators reports them as other. Not mutated: tests, generated files, constant declarations, logging and assertion calls (a removed log call survives for no good reason).\n3. Functions: every mutant belongs to the innermost function holding it (`function`, the id the analyze command writes), or to none at top level.\n4. Cap: when there are more candidates than --max-mutants, they are taken round-robin across functions (functions by file then start line, those outside any function as one group per file; each group's mutants in source order) until --max-mutants are taken. The sample is the same for the same code, so kept results are found again. `summary.candidates` counts all of them, `summary.sampled` says the cap applied.\n5. Tests: each mutant runs only the tests that can see it: those of its package (Go: the package's tests; Rust: the package's tests; JS/TS: the tests the engine's coverage says reach it, else the test files that import its file; Python: the test modules that import its module, else every test). First the same tests run on the unmutated code (the baseline); a mutant is stopped after max(--min-mutant-timeout, 3 x the baseline duration of its tests). Tests that fail on the unmutated code make each of their mutants an error, with a diagnostic. Up to --jobs mutants (default: half the CPUs, at least 1) run at the same time, each on its own copy or overlay, never two in the same files.\n6. Results kept: with --cache-dir, a mutant's result is reused when the fingerprint of its function is the same as when it was tested: a hash of the function's source text, the source of every test file it ran, the engine and its version, and the mutant itself (operator, original, mutated, its position inside the function). A reused result has `cached: true` and its kept duration; mutants whose function changed are tested again. An engine with its own incremental mode (StrykerJS) keeps its file in --cache-dir and marks what it reused.\n7. Order: mutants by file, then line, then column.\n\nWith --progress, it keeps that file up to date while it runs ($defs/progress), replacing it whole each time; the file may be missing until the mutants are listed.",
+  "type": "object",
+  "required": ["protocol", "language", "runner", "engine", "mutants", "summary", "diagnostics"],
+  "additionalProperties": false,
+  "properties": {
+    "protocol": { "const": 1 },
+    "language": { "description": "Language id, as `analyze` reports it.", "type": "string" },
+    "runner": {
+      "description": "Name and version of the analyzer.",
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": { "name": { "type": "string" }, "version": { "type": "string" } }
+    },
+    "engine": {
+      "description": "What made and ran the mutants: the analyzer's own mutator (Go, Python) or the tool it drives (\"cargo-mutants\", \"StrykerJS\"), with its version.",
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": { "name": { "type": "string" }, "version": { "type": "string" } }
+    },
+    "mutants": {
+      "description": "Every mutant tested (or reused), in the order of rule 7.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/mutant" }
+    },
+    "summary": { "$ref": "#/$defs/summary" },
+    "diagnostics": {
+      "description": "Problems that did not stop the run (tests failing on the unmutated code, the time limit, a file that could not be parsed), shown as they are.",
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "mutant": {
+      "type": "object",
+      "required": ["id", "file", "line", "column", "endLine", "endColumn", "original", "mutated", "operator", "description", "function", "status", "killedBy", "durationMs", "cached"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "description": "Unique in the report and the same for the same mutant of the same code from one run to the next (for instance a hash of file, function, operator, original, mutated and its position inside the function).", "type": "string", "minLength": 1 },
+        "file": { "description": "Relative to --dir, with \"/\" separators.", "type": "string" },
+        "line": { "description": "Line of the first character replaced.", "type": "integer", "minimum": 1 },
+        "column": { "description": "Column of the first character replaced, 1-based, counted in Unicode characters (code points).", "type": "integer", "minimum": 1 },
+        "endLine": { "description": "Line of the last character replaced.", "type": "integer", "minimum": 1 },
+        "endColumn": { "description": "Column just past the last character replaced (exclusive), 1-based, in Unicode characters, on endLine.", "type": "integer", "minimum": 1 },
+        "original": { "description": "The source text replaced, exactly as it is between (line, column) and (endLine, endColumn).", "type": "string" },
+        "mutated": { "description": "What replaces it; empty when the mutant removes it (call_removal).", "type": "string" },
+        "operator": {
+          "description": "The family of the change (rule 2).",
+          "enum": ["relational_boundary", "relational_negation", "arithmetic", "logical", "negation_removal", "return_value", "call_removal", "increment", "other"]
+        },
+        "description": { "description": "The engine's own words for the mutant, in English, such as \"replace >= with > in Account::withdraw\".", "type": "string" },
+        "function": { "description": "Id of the innermost function holding it, as the analyze command writes function ids, or null at top level.", "type": ["string", "null"] },
+        "status": {
+          "description": "killed: a test failed. survived: every test that ran passed. timeout: stopped after its time limit (most likely an infinite loop). error: it could not be tested (it does not compile, its tests fail without it, the runner crashed). no_coverage: the engine found that no test executes it.",
+          "enum": ["killed", "survived", "timeout", "error", "no_coverage"]
+        },
+        "killedBy": { "description": "For killed: the full name of a test that failed, as the test command's `name` writes it, or null when the engine cannot tell. Null otherwise.", "type": ["string", "null"] },
+        "durationMs": { "description": "How long its tests ran (for a reused result, when it was tested).", "type": "integer", "minimum": 0 },
+        "cached": { "description": "Its result was reused from an earlier run (rule 6).", "type": "boolean" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["candidates", "sampled", "maxMutants", "killed", "survived", "timeout", "error", "noCoverage", "cached", "durationMs"],
+      "additionalProperties": false,
+      "properties": {
+        "candidates": { "description": "Mutants found on the candidate lines, before the cap.", "type": "integer", "minimum": 0 },
+        "sampled": { "description": "There were more candidates than --max-mutants, so only a sample was tested (rule 4).", "type": "boolean" },
+        "maxMutants": { "description": "The --max-mutants the run used.", "type": "integer", "minimum": 1 },
+        "killed": { "type": "integer", "minimum": 0 },
+        "survived": { "type": "integer", "minimum": 0 },
+        "timeout": { "type": "integer", "minimum": 0 },
+        "error": { "type": "integer", "minimum": 0 },
+        "noCoverage": { "type": "integer", "minimum": 0 },
+        "cached": { "description": "Of the mutants, those whose result was reused.", "type": "integer", "minimum": 0 },
+        "durationMs": { "description": "The whole command, baselines included.", "type": "integer", "minimum": 0 }
+      }
+    },
+    "coverage": {
+      "description": "The --coverage file the core writes: the statement coverage of the last completed test run with coverage (tests.schema.json, $defs/coverage), as blocks of the project's own code. A line is covered when a block spanning it has count > 0.",
+      "type": "object",
+      "required": ["protocol", "blocks"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol": { "const": 1 },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "startLine", "endLine", "statements", "count"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "description": "Relative to --dir, with \"/\" separators.", "type": "string" },
+              "startLine": { "type": "integer", "minimum": 1 },
+              "endLine": { "type": "integer", "minimum": 1 },
+              "statements": { "type": "integer", "minimum": 0 },
+              "count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "progress": {
+      "description": "The file kept up to date with --progress.",
+      "type": "object",
+      "required": ["protocol", "phase", "total", "done", "killed", "survived", "timeout", "error", "current"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol": { "const": 1 },
+        "phase": { "description": "baseline: running the tests on the unmutated code; mutating: testing mutants.", "enum": ["baseline", "mutating"] },
+        "total": { "description": "Mutants the run will report (after the cap).", "type": "integer", "minimum": 0 },
+        "done": { "description": "Of those, the ones with a result so far (reused ones included).", "type": "integer", "minimum": 0 },
+        "killed": { "type": "integer", "minimum": 0 },
+        "survived": { "type": "integer", "minimum": 0 },
+        "timeout": { "type": "integer", "minimum": 0 },
+        "error": { "description": "Errors and no_coverage together.", "type": "integer", "minimum": 0 },
+        "current": { "description": "\"file:line\" of a mutant running now, or null.", "type": ["string", "null"] }
+      }
+    }
+  }
+}
