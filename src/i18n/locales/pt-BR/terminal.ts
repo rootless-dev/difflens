@@ -1,0 +1,77 @@
+import type { Catalog } from "@/i18n/catalog";
+
+export const terminal: Catalog["terminal"] = {
+  region: "Terminal",
+  expand: "Expandir o terminal",
+  collapse: "Recolher o terminal",
+  expandTitle: "Expandir o terminal ({{keys}}). As sessões continuam rodando.",
+  collapseTitle: "Recolher o terminal ({{keys}}). As sessões continuam rodando.",
+  sessions: "Sessões do terminal",
+  tab: {
+    running: "{{name}}, rodando {{command}}",
+    runningSomething: "{{name}}, rodando um processo",
+    ended: "{{name}}, processo encerrado",
+    newOutput: "{{label}}, saída nova",
+    close: "Fechar {{name}}",
+    pending: "{{name}}, esperando a worktree",
+    cancelPending: "Cancelar {{name}}",
+  },
+  add: {
+    label: "Nova sessão",
+    shell: "Novo terminal",
+    claude: "Novo Claude Code",
+  },
+  location: {
+    folder: "Pasta",
+    branch: "Branch",
+    none: "nenhuma pasta ainda",
+    noneTitle: "A branch {{branch}} não está em checkout em nenhuma pasta",
+    difflens: "worktree do DiffLens",
+    difflensTitle:
+      "Criada pelo DiffLens dentro do projeto; a pasta .difflens/ está no .git/info/exclude. Você a remove na página do projeto.",
+    project: "pasta do projeto",
+    projectTitle:
+      "A branch já está em checkout na pasta do projeto, por isso o terminal abre lá. Os comandos aqui alteram a sua pasta do projeto.",
+    worktree: "worktree",
+    worktreeTitle: "Uma worktree que você criou fora do DiffLens, onde esta branch está em checkout.",
+    detached: "HEAD destacado",
+  },
+  others_one: "{{count}} sessão em <code>{{where}}</code>",
+  others_other: "{{count}} sessões em <code>{{where}}</code>",
+  othersTitle: "{{names}}: continuam rodando na revisão de {{where}}. Clique para ir até ela.",
+  exited: "[processo encerrado]",
+  exitedWithCode: "[processo encerrado com código {{code}}]",
+  height: "Altura do terminal",
+  heightTitle: "Arraste para mudar a altura",
+  openFailed: "Não foi possível abrir o terminal: {{message}}",
+  close: {
+    shellTitle: "Fechar este terminal?",
+    claudeTitle: "Fechar o Claude Code?",
+    shellText: "<code>{{command}}</code> ainda está rodando e será interrompido.",
+    shellTextUnknown: "Um processo ainda está rodando e será interrompido.",
+    claudeText:
+      "<code>claude</code> ainda está rodando e será encerrado. Se ele estiver no meio de uma tarefa, ela para onde estiver.",
+    confirm: "Fechar mesmo assim",
+  },
+  create: {
+    title: "A branch <code>{{branch}}</code> não está em nenhuma pasta",
+    introShell: "Para abrir um terminal nela, o DiffLens cria uma worktree dentro do projeto.",
+    introClaude: "Para abrir o Claude Code nela, o DiffLens cria uma worktree dentro do projeto.",
+    remoteOnly: "Ela só existe no remoto.",
+    whatLocal:
+      "Cria a worktree em <code>{{path}}</code> com a branch <code>{{branch}}</code>. A pasta <code>.difflens/</code> entra no <code>.git/info/exclude</code>; sua pasta do projeto não é alterada.",
+    whatRemote:
+      "Cria a worktree em <code>{{path}}</code> com uma branch local <code>{{branch}}</code> que acompanha <code>{{upstream}}</code>. A pasta <code>.difflens/</code> entra no <code>.git/info/exclude</code>; sua pasta do projeto não é alterada.",
+    confirm: "Criar worktree e abrir",
+    hint: "Ela aparece em Worktrees do DiffLens, na página do projeto, onde você pode removê-la.",
+    creating: "Criando a worktree de <code>{{branch}}</code>",
+    stepExclude: "A pasta <code>.difflens/</code> entrou no <code>.git/info/exclude</code>",
+    stepTracking: "Branch local <code>{{branch}}</code> criada, acompanhando <code>{{upstream}}</code>",
+    stepAdd: "<code>git worktree add {{path}}</code>",
+    stepOpenShell: "Abrir o terminal na worktree",
+    stepOpenClaude: "Abrir o Claude Code na worktree",
+    done: "feito",
+    progress: "Criando a worktree",
+    failed: "Não foi possível criar a worktree: {{message}}",
+  },
+};
