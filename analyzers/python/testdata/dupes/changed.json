@@ -1,0 +1,10 @@
+{
+  "protocol": 1,
+  "exclude": { "dirs": ["locales", "i18n"], "extensions": [".po", ".l10n.py"] },
+  "files": [
+    { "path": "shop/orders.py", "added": [[15, 39]] },
+    { "path": "shop/reports.py", "added": [[1, 60]] },
+    { "path": "shop/api_client.py", "added": [[1, 15]] },
+    { "path": "NOTES.md", "added": [[1, 3]] }
+  ]
+}

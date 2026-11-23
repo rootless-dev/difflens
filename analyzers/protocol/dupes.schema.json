@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://difflens.dev/analyzers/protocol/dupes.schema.json",
+  "title": "DiffLens language analyzer duplicate code output, protocol version 1",
+  "description": "`<analyzer> dupes --dir <tree> --timeout <duration> --changed <file> [--min-tokens 50] [--min-lines 6]` looks for duplicated code that a review introduces in one source tree (the new side of the review) and prints exactly one JSON document matching this schema on stdout, exiting 0 whenever it could report. `--changed` names a JSON file matching `$defs/changed`: the lines the review adds, per file. It reads the code only: it must not execute project code and must not write inside --dir. Logs go to stderr; a non-zero exit means the analyzer itself failed (1), or the command line or the --changed file is wrong (2). Defaults: --timeout 120s, --min-tokens 50, --min-lines 6; both minimums must be at least 1.\n\nHow every analyzer finds them, so the languages agree:\n1. Files: the language's own source files under --dir, test files included, without the folders the analyzer already skips (vendor, node_modules, target, .venv, hidden folders and the like), without files the analyzer reports as generated, without minified files, without files over 1 MiB, and without the files the `exclude` of --changed names (translation catalogs, see `$defs/changed`).\n2. Scopes: every token is production code or test code, and the search (steps 3 to 9) runs once per scope, on the tokens of that scope only, so a clone never pairs test code with production code. Test code is the test files as the analyzer's `analyze` classifies them, which include at least, per language: Go, files named `*_test.go`; Python, files named `test_*.py`, `*_test.py` or `conftest.py`, and every file under a folder named `tests` or `test`; JS/TS, files whose name holds `.test.` or `.spec.`, and every file under a folder named `__tests__`; Rust, every file under a folder named `tests`, and, in the other files, every item an outer `#[cfg(test)]` (or `#[cfg(all(test, ...))]`) attribute applies to (usually `mod tests { ... }`), from the attribute through the end of the item. Everything else is production code. In Rust the two scopes of one file are separate splits: no clone spans the boundary between them.\n3. Tokens: the language's own lexer, comments and whitespace dropped. Identifiers become one placeholder (ID), string and character literals another (STR), number literals another (NUM); keywords, operators and punctuation are kept as they are (type-1 and type-2 clones). Import statements (Go `import`, Python `import` / `from ... import`, JS/TS `import` and `export ... from` declarations and top-level `require` statements, Rust `use`, `extern crate` and `mod name;`) are left out and split the file: no clone spans them. Each token keeps the line it starts on and the line it ends on.\n4. Windows: every run of --min-tokens consecutive tokens of a file, within one split. A window touches the change when one of its tokens starts on an added line.\n5. Candidates: hash every window that touches the change (a rolling hash), then every window of every file; windows sharing the hash of a touching window are grouped by hash. A group of one is dropped; so is a group of more than 64 windows (boilerplate).\n6. Pairs: in each group, every two windows of which at least one touches the change, whose tokens are really equal (a hash can collide), and that do not overlap (same file). Each pair is extended backward and forward while the tokens are equal, within the splits of both files and without the two ranges ever overlapping, into a maximal pair; equal maximal pairs are kept once. A maximal pair is dropped when either of its sides spans fewer than --min-lines lines (end line minus start line plus one).\n7. Sides: a side is new when at least half of the lines it spans are added; otherwise it is existing. A pair without a new side is dropped.\n8. Blocks: the new sides of the same file whose lines overlap are merged into one block (the union of their lines), until no two blocks of a file overlap. The other side of each pair is an occurrence of the block: an existing occurrence, or the block holding that new side.\n9. Groups: a block with at least one existing occurrence is `copies_existing`; its `others` are its existing occurrences, those of a file whose lines overlap merged. The blocks without an existing occurrence that are occurrences of one another (transitively) form one `repeated_in_change` group: `block` is the first of them by file then start line, `others` the rest (a group of one block, whose only new occurrences copy existing code, is dropped). `tokens` is the largest number of tokens of the group's maximal pairs; `lines` is the block's line count. Each group carries the scope it was found in (`scope`).\n10. Order: the production groups first, then the test groups; within a scope, groups by block file then start line, others likewise. At most 500 groups per scope; past that, the rest of that scope are dropped and a diagnostic says so. A search that runs out of time reports the groups found so far and a diagnostic.",
+  "type": "object",
+  "required": ["protocol", "language", "runner", "minTokens", "minLines", "duplicates", "diagnostics"],
+  "additionalProperties": false,
+  "properties": {
+    "protocol": { "const": 1 },
+    "language": {
+      "description": "Language id, as `analyze` reports it.",
+      "type": "string"
+    },
+    "runner": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": { "name": { "type": "string" }, "version": { "type": "string" } }
+    },
+    "minTokens": { "description": "The --min-tokens the search used.", "type": "integer", "minimum": 1 },
+    "minLines": { "description": "The --min-lines the search used.", "type": "integer", "minimum": 1 },
+    "duplicates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/duplicate" }
+    },
+    "diagnostics": {
+      "description": "Problems that did not stop the search (a file that could not be read or tokenized, the time limit), shown as they are.",
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "duplicate": {
+      "type": "object",
+      "required": ["kind", "scope", "block", "others", "tokens", "lines"],
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "description": "The scope the group was found in (step 2): every occurrence of a production group is production code, every occurrence of a test group is test code.",
+          "enum": ["production", "test"]
+        },
+        "kind": {
+          "description": "copies_existing: the block is identical, or identical but for identifiers and literals, to code the review did not add. repeated_in_change: the block appears two or more times in the code the review added.",
+          "enum": ["copies_existing", "repeated_in_change"]
+        },
+        "block": { "$ref": "#/$defs/range" },
+        "others": {
+          "description": "The other occurrences: the existing code it copies, or the other times it is repeated in the change. Never empty.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/range" }
+        },
+        "tokens": { "description": "Normalized tokens the copies share.", "type": "integer", "minimum": 1 },
+        "lines": { "description": "Lines the block spans.", "type": "integer", "minimum": 1 }
+      }
+    },
+    "range": {
+      "type": "object",
+      "required": ["file", "startLine", "endLine"],
+      "additionalProperties": false,
+      "properties": {
+        "file": { "description": "Relative to --dir, with \"/\" separators.", "type": "string" },
+        "startLine": { "type": "integer", "minimum": 1 },
+        "endLine": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "changed": {
+      "description": "The --changed file the core writes: the lines the review adds on the new side, per file (paths relative to --dir, \"/\" separators), as inclusive 1-based ranges. A file not listed has no added line; a file listed that is not a source file of the language is ignored.",
+      "type": "object",
+      "required": ["protocol", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol": { "const": 1 },
+        "exclude": {
+          "description": "Files `dupes` leaves out entirely (step 1), by a rule the core owns: translation catalogs. A file is left out when a folder of its path (a segment before the file name) is named one of `dirs`, or when its file name ends with one of `extensions`; both compared ignoring ASCII case. Absent means nothing is left out. Other commands that read this file (`mutate`) accept it and ignore it.",
+          "type": "object",
+          "required": ["dirs", "extensions"],
+          "additionalProperties": false,
+          "properties": {
+            "dirs": { "type": "array", "items": { "type": "string" } },
+            "extensions": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "added"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "added": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "prefixItems": [
+                    { "type": "integer", "minimum": 1 },
+                    { "type": "integer", "minimum": 1 }
+                  ],
+                  "minItems": 2,
+                  "maxItems": 2
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

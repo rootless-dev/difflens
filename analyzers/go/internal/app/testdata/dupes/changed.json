@@ -1,0 +1,9 @@
+{
+  "protocol": 1,
+  "files": [
+    { "path": "added.go", "added": [[1, 59]] },
+    { "path": "repeated.go", "added": [[1, 43]] },
+    { "path": "zz_generated.go", "added": [[1, 18]] },
+    { "path": "notes.md", "added": [[1, 3]] }
+  ]
+}

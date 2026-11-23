@@ -1,0 +1,15 @@
+{
+  "protocol": 1,
+  "files": [
+    { "path": "src/added/barrel.ts", "added": [[1, 15]] },
+    { "path": "src/added/client.ts", "added": [[1, 16]] },
+    { "path": "src/added/handlers.ts", "added": [[1, 49]] },
+    { "path": "src/added/legacy.cjs", "added": [[1, 15]] },
+    { "path": "src/added/limits.ts", "added": [[1, 5]] },
+    { "path": "src/added/schema.generated.ts", "added": [[1, 16]] },
+    { "path": "src/added/vendor.min.js", "added": [[1, 14]] },
+    { "path": "src/billing/summary.ts", "added": [[6, 17], [18, 23]] },
+    { "path": "NOTES.md", "added": [[1, 3]] },
+    { "path": "src/removed/gone.ts", "added": [[1, 40]] }
+  ]
+}
