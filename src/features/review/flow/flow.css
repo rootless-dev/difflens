@@ -1,0 +1,98 @@
+/* React Flow themed with the app palette. Unlayered, so it wins over React Flow's own `xyflow` layer. */
+
+.flow-canvas .react-flow {
+    /* React Flow picks light or dark from the OS; the app's theme decides instead. */
+    color-scheme: inherit;
+    --xy-background-color: transparent;
+    --xy-background-pattern-color: var(--border);
+    --xy-attribution-background-color: transparent;
+    --xy-minimap-background-color: var(--card);
+    --xy-minimap-mask-background-color: color-mix(in srgb, var(--background) 70%, transparent);
+    --xy-minimap-node-background-color: var(--faint);
+}
+
+.flow-canvas .react-flow__attribution a {
+    color: var(--faint);
+}
+
+.flow-canvas .react-flow__node {
+    transition: opacity 0.15s;
+}
+
+/* With the move key held a box is grabbed rather than opened. */
+.flow-canvas[data-moving] .react-flow__node,
+.flow-canvas[data-moving] .react-flow__node button {
+    cursor: grab;
+}
+
+.flow-canvas .react-flow__node.dragging,
+.flow-canvas .react-flow__node.dragging button {
+    cursor: grabbing;
+}
+
+/* A graph with other options is on its way: the current one stays, faded, until it arrives. */
+.flow-canvas .react-flow__viewport {
+    transition: opacity 0.15s;
+}
+
+.flow-canvas[aria-busy="true"] .react-flow__viewport {
+    opacity: 0.6;
+}
+
+.flow-canvas .react-flow__controls {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--card);
+}
+
+.flow-canvas .react-flow__controls-button {
+    border: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+}
+
+.flow-canvas .react-flow__controls-button + .react-flow__controls-button {
+    border-top: 1px solid var(--border);
+}
+
+.flow-canvas .react-flow__controls-button:hover {
+    background: var(--secondary);
+    color: var(--foreground);
+}
+
+.flow-canvas .react-flow__minimap {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+}
+
+/* The popover's caret, a square turned 45 degrees that shows two of its borders (the prototype's .pop::before). */
+.flow-pop::before {
+    content: "";
+    position: absolute;
+    top: calc(var(--caret, 40px) - 6px);
+    width: 12px;
+    height: 12px;
+    border: 1px solid var(--faint);
+    background: var(--card);
+    transform: rotate(45deg);
+}
+
+.flow-pop[data-side="right"]::before {
+    left: -7px;
+    border-top: 0;
+    border-right: 0;
+}
+
+.flow-pop[data-side="left"]::before {
+    right: -7px;
+    border-bottom: 0;
+    border-left: 0;
+}
+
+/* Moved over its node to stay inside the canvas: nothing beside it to point at. */
+.flow-pop[data-side="over"]::before {
+    display: none;
+}
