@@ -1109,14 +1109,31 @@ cat "$dir/fixture/analysis.json"
     #[test]
     fn a_hanging_analyzer_is_stopped_with_everything_it_started() {
         let harness = Harness::with_settings(settings(Duration::from_millis(1500)));
-        let (old, _) = two_commits(&harness);
+        let (old, new) = two_commits(&harness);
+        // The old side is analysed first, without the short limit, by a
+        // service sharing the cache: under the limit it would race the
+        // hanging side, and a slow start of its analyzer would fail the old
+        // side instead. Only the hanging analyzer runs below.
+        let unhurried = FlowService::new(
+            isolated_git(),
+            harness.cache.path().to_path_buf(),
+            AnalyzerLocator::with_executable("go", harness.tools.path().join("fake analyzer")),
+            ToolPath::fixed(TOOL_PATH),
+            settings(Duration::from_secs(30)),
+        );
+        let warmed = unhurried
+            .flow(PROJECT, harness.repo.path(), &old, Some(&new), FlowOptions::default())
+            .unwrap();
+        assert!(matches!(warmed, FlowResult::Graph { .. }), "{warmed:?}");
         harness.repo.write("fixture/hang", "");
         harness.repo.commit_all("hang");
         let hanging = harness.repo.git(&["rev-parse", "HEAD"]);
+        let runs = harness.runs();
 
         let started = Instant::now();
         let (side, message) = failure(harness.flow(&old, Some(&hanging)));
 
+        assert_eq!(harness.runs(), runs + 1, "the old side is read from the cache");
         assert_eq!(side, ReviewSide::New);
         assert!(
             message.contains("did not finish within 1 seconds"),
