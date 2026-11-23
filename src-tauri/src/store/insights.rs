@@ -933,7 +933,7 @@ mod tests {
             for migration in &super::super::MIGRATIONS[..before] {
                 connection.execute_batch(migration).unwrap();
             }
-            connection.pragma_update(None, "user_version", before).unwrap();
+            connection.pragma_update(None, "user_version", before as i64).unwrap();
             connection
                 .execute_batch(
                     "INSERT INTO projects (id, path, added_at, integration_branches)

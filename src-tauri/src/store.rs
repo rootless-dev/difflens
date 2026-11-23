@@ -613,7 +613,8 @@ fn migrate(connection: &mut Connection) -> AppResult<()> {
     for (index, migration) in MIGRATIONS.iter().enumerate().skip(applied) {
         let transaction = connection.transaction()?;
         transaction.execute_batch(migration)?;
-        transaction.pragma_update(None, "user_version", index + 1)?;
+        // rusqlite no longer binds usize; the migration count always fits in i64.
+        transaction.pragma_update(None, "user_version", (index + 1) as i64)?;
         transaction.commit()?;
     }
     Ok(())
@@ -872,7 +873,7 @@ mod tests {
             for migration in &MIGRATIONS[..before] {
                 connection.execute_batch(migration).unwrap();
             }
-            connection.pragma_update(None, "user_version", before).unwrap();
+            connection.pragma_update(None, "user_version", before as i64).unwrap();
             connection
                 .execute_batch(
                     "INSERT INTO projects (id, path, added_at, integration_branches)
@@ -908,7 +909,7 @@ mod tests {
         {
             let connection = Connection::open(&file).unwrap();
             connection
-                .pragma_update(None, "user_version", MIGRATIONS.len() + 1)
+                .pragma_update(None, "user_version", MIGRATIONS.len() as i64 + 1)
                 .unwrap();
         }
 
