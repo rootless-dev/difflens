@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+.superpowers/
+.claude/
+node_modules/
+dist/
+target/
+src-tauri/gen/
+src-tauri/binaries/difflens-analyzer-*
+*.log
+__pycache__/
+.venv/

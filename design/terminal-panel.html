@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiffLens, terminal embutido (mockup)</title>
+<style>
+  /* Tokens of design/prototype.html, unchanged. */
+  :root[data-theme="dark"] {
+    --bg:#151925; --panel:#1a1f2e; --raised:#232a3d; --line:#2c344c; --text:#e7e9f2; --muted:#8d96ae; --faint:#5c6580;
+    --accent:#7ea6ff; --accent-soft:rgba(126,166,255,.14);
+    --add:#56cf97; --del:#f27d72; --mod:#e9b85c; --ai:#d992e0;
+    --add-bg:rgba(86,207,151,.11); --del-bg:rgba(242,125,114,.11); --mod-bg:rgba(233,184,92,.10); --ai-bg:rgba(217,146,224,.09);
+    --syn-kw:#d992e0; --syn-str:#7cc7d8; --syn-type:#7ea6ff;
+    --scrim:rgba(8,10,16,.55);
+    color-scheme:dark;
+  }
+  :root[data-theme="light"] {
+    --bg:#eceff5; --panel:#f7f8fb; --raised:#ffffff; --line:#d8ddea; --text:#1b2132; --muted:#5d6780; --faint:#98a1b7;
+    --accent:#2f5fd8; --accent-soft:rgba(47,95,216,.10);
+    --add:#12855a; --del:#c8402f; --mod:#a06c08; --ai:#9b3fa8;
+    --add-bg:rgba(18,133,90,.10); --del-bg:rgba(200,64,47,.09); --mod-bg:rgba(160,108,8,.09); --ai-bg:rgba(155,63,168,.07);
+    --syn-kw:#9b3fa8; --syn-str:#1f7891; --syn-type:#2f5fd8;
+    --scrim:rgba(20,25,40,.32);
+    color-scheme:light;
+  }
+  * { box-sizing:border-box; margin:0; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  html, body { height:100%; }
+  body { font:13px/1.45 "IBM Plex Sans", system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden; }
+  code, .mono, pre, kbd { font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:12px; }
+  button, input { font:inherit; color:inherit; }
+  button { background:none; border:0; cursor:pointer; padding:0; text-align:left; }
+  button:disabled { cursor:default; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+  [hidden] { display:none !important; }
+  kbd { font-size:11px; padding:0 4px; border:1px solid var(--line); border-radius:4px; color:var(--faint); background:var(--bg); }
+
+  /* ---------- mockup controls and notes: not part of the app ---------- */
+  .mock { flex:none; position:relative; z-index:30; display:flex; align-items:center; gap:10px 14px; flex-wrap:wrap; padding:8px 16px; background:repeating-linear-gradient(135deg, var(--bg) 0 10px, var(--panel) 10px 20px); border-bottom:2px dashed var(--faint); font-size:12px; }
+  .mock strong { font-weight:600; color:var(--muted); }
+  .mock .seg { display:inline-flex; flex-wrap:wrap; align-items:center; padding:2px; border-radius:7px; background:var(--panel); border:1px solid var(--line); }
+  .mock .seg .sl { padding:3px 8px 3px 6px; color:var(--faint); font-weight:600; }
+  .mock .seg button { padding:3px 10px; border-radius:5px; color:var(--muted); white-space:nowrap; }
+  .mock .seg button[aria-pressed="true"] { background:var(--raised); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  .mock .seg button.variant { border:1px dashed var(--faint); margin-left:4px; }
+  .mock .note { color:var(--faint); }
+  .ghost { padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); white-space:nowrap; }
+  .ghost:hover { color:var(--text); border-color:var(--faint); }
+  .mnotes { position:fixed; top:0; right:0; bottom:0; z-index:60; width:min(560px, 92vw); overflow:auto; padding:22px 24px 40px; background:repeating-linear-gradient(135deg, var(--bg) 0 10px, var(--panel) 10px 20px); border-left:2px dashed var(--faint); box-shadow:-20px 0 50px rgba(0,0,0,.3); }
+  .mnotes h2 { font-size:13px; font-weight:600; color:var(--muted); margin:18px 0 8px; }
+  .mnotes h2:first-of-type { margin-top:0; }
+  .mnotes ul { display:grid; gap:7px; padding-left:20px; }
+  .mnotes li b { font-weight:600; }
+  .mnotes .close { position:absolute; top:14px; right:16px; }
+  .mocknote { position:absolute; z-index:45; max-width:330px; padding:8px 11px; font-size:12px; color:var(--text); border:2px dashed var(--faint); border-radius:8px; background:repeating-linear-gradient(135deg, var(--bg) 0 10px, var(--panel) 10px 20px); }
+  .mocknote b { font-weight:600; color:var(--muted); }
+  .mocknote.inline { position:static; max-width:none; margin:0 0 16px; }
+
+  /* ---------- app chrome ---------- */
+  .app { flex:1; min-height:0; display:flex; flex-direction:column; position:relative; }
+  .bar { flex:none; display:flex; align-items:center; gap:14px; height:46px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .logo { display:flex; align-items:center; gap:8px; font-weight:600; letter-spacing:-.01em; }
+  .crumb { display:flex; align-items:center; gap:8px; color:var(--muted); min-width:0; }
+  .crumb .c { padding:4px 8px; border-radius:6px; color:var(--text); font-weight:500; white-space:nowrap; }
+  .rbar { flex:1; min-width:0; display:flex; align-items:center; gap:12px; }
+  .compare { display:flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--raised); white-space:nowrap; }
+  .compare .into { color:var(--faint); }
+  .stat { color:var(--muted); white-space:nowrap; } .stat .a { color:var(--add); } .stat .d { color:var(--del); }
+  .spacer { flex:1; }
+  .ext { display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border:1px solid var(--line); border-radius:6px; color:var(--text); text-decoration:none; font-size:12px; white-space:nowrap; }
+  .ext.card { color:var(--accent); font-family:"IBM Plex Mono", monospace; }
+  .sides { display:flex; align-items:center; gap:8px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .sides i { width:8px; height:8px; border-radius:50%; background:var(--add); }
+  .outline { padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--text); white-space:nowrap; background:var(--panel); }
+  .outline:hover { border-color:var(--faint); }
+
+  .tabs { flex:none; display:flex; align-items:flex-end; gap:4px; padding:0 12px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .tab { padding:10px 12px 9px; color:var(--muted); border-bottom:2px solid transparent; font-weight:500; white-space:nowrap; }
+  button.tab:hover { color:var(--text); }
+  .tab[aria-selected="true"] { color:var(--text); border-color:var(--accent); }
+  .tab[aria-disabled="true"] { color:var(--faint); }
+  .count { margin-left:6px; padding:0 6px; border-radius:9px; font-size:11px; background:var(--del-bg); color:var(--del); }
+  .count.ai { background:var(--ai-bg); color:var(--ai); }
+  .rprog { margin-left:auto; align-self:center; display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .rprog .pbar { width:90px; height:5px; border-radius:3px; background:var(--line); overflow:hidden; }
+  .rprog .pbar i { display:block; height:100%; width:33%; background:var(--add); }
+
+  /* buttons, as in the app */
+  .primary { padding:7px 14px; border-radius:7px; background:var(--accent); color:var(--bg); font-weight:500; white-space:nowrap; }
+  .primary:hover { filter:brightness(1.08); }
+  .secondary { padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:var(--raised); white-space:nowrap; }
+  .secondary:hover { border-color:var(--faint); }
+  .danger { padding:6px 12px; border-radius:7px; background:var(--del); color:var(--bg); font-weight:500; white-space:nowrap; }
+  .danger:hover { filter:brightness(1.08); }
+  .sm { padding:4px 10px; font-size:12px; border-radius:6px; }
+  .linkish { color:var(--accent); font-size:12px; white-space:nowrap; } .linkish:hover { text-decoration:underline; }
+  em.t-ai { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; background:var(--ai-bg); color:var(--ai); }
+  .hint { color:var(--faint); font-size:12px; }
+  .spin { display:inline-block; width:12px; height:12px; border:1.6px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; flex:none; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ---------- review screen ---------- */
+  .rscreen { flex:1; min-height:0; display:flex; flex-direction:column; }
+  .views { flex:1; min-height:0; overflow:auto; }
+  .diffv { display:grid; grid-template-columns:270px minmax(0,1fr); min-height:100%; }
+  .files { border-right:1px solid var(--line); background:var(--panel); padding:10px 8px; }
+  .files input { width:100%; padding:5px 9px; border:1px solid var(--line); border-radius:6px; background:var(--bg); margin-bottom:8px; }
+  .files input::placeholder { color:var(--faint); }
+  .files ul { list-style:none; padding:0; }
+  .files li { display:grid; grid-template-columns:14px minmax(0,1fr) auto; gap:8px; align-items:center; padding:4px 8px; border-radius:6px; font-family:"IBM Plex Mono", monospace; font-size:12px; }
+  .files li.on { background:var(--accent-soft); }
+  .files .fs { font-size:11px; } .files .fs.m { color:var(--mod); } .files .fs.a { color:var(--add); }
+  .files .fp { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .files .fp .dir { color:var(--faint); }
+  .files .st { font-size:11px; } .files .st .a { color:var(--add); } .files .st .d { color:var(--del); }
+  .hunkv { padding:16px 20px 30px; min-width:0; }
+  .fh { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+  .fh code { font-size:13px; font-weight:500; }
+  .code { border:1px solid var(--line); border-radius:8px; overflow:hidden; font:12px/1.7 "IBM Plex Mono", monospace; background:var(--panel); tab-size:4; }
+  .code .hh { padding:2px 12px; color:var(--faint); background:var(--accent-soft); }
+  .code .ln { display:grid; grid-template-columns:40px 40px minmax(0,1fr); white-space:pre; }
+  .code .ln i { font-style:normal; color:var(--faint); text-align:right; padding-right:10px; user-select:none; }
+  .code .ln.add { background:var(--add-bg); } .code .ln.del { background:var(--del-bg); }
+  /* The + and − sit in their own column, once per line, before the code text. */
+  .code .ln > span { position:relative; padding-left:22px; }
+  .code .ln.add > span::before, .code .ln.del > span::before { position:absolute; left:6px; top:0; user-select:none; }
+  .code .ln.add > span::before { content:"+"; color:var(--add); }
+  .code .ln.del > span::before { content:"−"; color:var(--del); }
+  .code .k { color:var(--syn-kw); } .code .s { color:var(--syn-str); } .code .ty { color:var(--syn-type); }
+  .ov { padding:28px max(28px, calc(50% - 600px)) 40px; max-width:900px; }
+  .ov h1 { font-size:18px; font-weight:600; letter-spacing:-.01em; }
+  .ov .by { display:flex; align-items:center; gap:8px; color:var(--faint); font-size:12px; margin:6px 0 12px; }
+  .ov p.prose { max-width:72ch; }
+  h2.sect { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; color:var(--muted); margin:26px 0 10px; }
+  h2.sect small { font-size:12px; font-weight:400; color:var(--faint); }
+  .look { list-style:none; padding:0; display:grid; gap:8px; }
+  .look li { display:grid; grid-template-columns:22px 1fr; gap:10px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+  .look .rk { color:var(--faint); font-family:"IBM Plex Mono", monospace; }
+  .look strong { font-weight:500; display:block; }
+  .look span.dt { color:var(--muted); font-size:12px; }
+
+  /* ---------- terminal: the expanded panel, above the footer bar ---------- */
+  .term { flex:none; position:relative; display:flex; flex-direction:column; min-height:0; background:var(--bg); border-top:1px solid var(--line); }
+  .grip { position:absolute; top:-4px; left:0; right:0; height:7px; z-index:6; cursor:ns-resize; touch-action:none; }
+  .grip::before { content:""; position:absolute; left:0; right:0; top:3px; height:1px; background:transparent; transition:background .1s; }
+  .grip::after { content:""; position:absolute; left:50%; top:1px; width:36px; height:4px; margin-left:-18px; border-radius:3px; background:var(--line); }
+  .grip:hover::before, .grip.drag::before, .grip:focus-visible::before { background:var(--accent); height:2px; top:2px; }
+  .grip:hover::after, .grip.drag::after { background:var(--accent); }
+  .grip:focus-visible { outline:none; }
+  .tbody { flex:1; min-height:0; overflow:auto; padding:10px 14px 14px; background:var(--bg); font:12px/1.6 "IBM Plex Mono", ui-monospace, monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .tbody:focus-visible { outline-offset:-2px; }
+  .t-p { color:var(--accent); } .t-g { color:var(--add); } .t-r { color:var(--del); } .t-y { color:var(--mod); } .t-m { color:var(--ai); } .t-dim { color:var(--faint); } .t-b { font-weight:500; }
+  .cur { display:inline-block; width:7px; height:14px; vertical-align:-2px; background:var(--text); animation:blink 1.1s steps(1) infinite; }
+  .tbody:not(:focus-within) .cur { animation:none; background:transparent; box-shadow:inset 0 0 0 1px var(--muted); }
+  @keyframes blink { 50% { opacity:0; } }
+  /* The other program's own screen, drawn as text: a plain box with the folder, then the conversation and an input line. */
+  .cc-box { display:block; max-width:640px; padding:6px 12px; margin-bottom:12px; border:1px solid var(--ai); border-radius:6px; white-space:normal; }
+  .cc-box > span { display:block; white-space:pre-wrap; }
+  .cc-in { display:block; padding:3px 10px; margin-top:12px; border:1px solid var(--line); border-radius:6px; white-space:pre-wrap; }
+
+  /* The panel's own screens: worktree to create, being created. */
+  .tcreate { flex:1; min-height:0; overflow:auto; padding:20px 24px; background:var(--bg); }
+  .tcreate > div { max-width:660px; }
+  .tcreate h3 { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; }
+  .tcreate h3 code { font-size:13px; }
+  .tcreate p { margin-top:8px; max-width:74ch; }
+  .tcreate p.cwhat { padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--muted); }
+  .tcreate p.cwhat code { color:var(--text); }
+  .cacts { display:flex; align-items:center; gap:8px; margin-top:16px; }
+  .tcreate .hint { margin-top:12px; }
+  .steps { list-style:none; padding:0; margin-top:14px; display:grid; gap:8px; }
+  .steps li { display:grid; grid-template-columns:16px 1fr; gap:10px; align-items:center; color:var(--muted); }
+  .steps li.done .mk { color:var(--add); } .steps li.todo { color:var(--faint); }
+  .steps li.now { color:var(--text); }
+  .steps .mk { text-align:center; }
+  .steps .faint { color:var(--faint); }
+  .prog { margin-top:16px; height:5px; max-width:520px; border-radius:3px; background:var(--line); overflow:hidden; }
+  .prog i { display:block; height:100%; width:33%; background:var(--accent); }
+  .prog.auto i { animation:fill 2.2s ease-in-out forwards; }
+  @keyframes fill { from { width:12%; } to { width:100%; } }
+
+  /* ---------- terminal: the footer bar, always there, like a status bar ---------- */
+  .foot { flex:none; position:relative; z-index:7; display:flex; align-items:stretch; gap:2px; height:32px; padding:0 10px 0 4px; background:var(--panel); border-top:1px solid var(--line); font-size:12px; }
+  .ftabs { display:flex; min-width:0; overflow-x:auto; scrollbar-width:none; }
+  .ttab { position:relative; display:flex; align-items:center; gap:1px; padding:0 3px 0 1px; border-top:2px solid transparent; margin-top:-1px; color:var(--muted); white-space:nowrap; }
+  .ttab:hover { color:var(--text); }
+  /* Expanded, the tab shown above reads as joined to the panel: its colour and an accent edge on the panel's side. */
+  .foot.open .ttab.on { color:var(--text); background:var(--bg); border-top-color:var(--accent); }
+  .ttab.pending { color:var(--faint); }
+  .foot.open .ttab.pending { border-top-style:dashed; }
+  .ttab .tl { display:flex; align-items:center; gap:6px; height:100%; padding:0 3px 0 8px; border-radius:5px; }
+  .ttab .tl:focus-visible { outline-offset:-3px; }
+  .ico { display:inline-flex; flex:none; color:var(--muted); }
+  .ico.cc { color:var(--ai); }
+  .ttab .proc { font-family:"IBM Plex Mono", monospace; font-size:11.5px; color:var(--faint); }
+  .ttab .proc::before { content:"· "; }
+  .adot { width:6px; height:6px; border-radius:50%; background:var(--accent); flex:none; }
+  .tx { width:18px; height:18px; display:grid; place-items:center; border-radius:4px; color:var(--faint); opacity:0; }
+  .foot.open .ttab.on .tx, .ttab:hover .tx, .tx:focus-visible { opacity:1; }
+  .tx:hover { background:var(--raised); color:var(--text); }
+  .ticon { align-self:center; width:24px; height:24px; display:grid; place-items:center; border-radius:6px; color:var(--muted); flex:none; }
+  .ticon:hover, .ticon[aria-expanded="true"] { background:var(--raised); color:var(--text); }
+  .ticon.chev { margin-right:4px; }
+  .addwrap { position:relative; display:flex; align-items:center; margin-left:2px; }
+  .tspacer { flex:1; min-width:12px; }
+  .ochip { align-self:center; display:inline-flex; align-items:center; gap:6px; padding:1px 9px; margin-right:10px; border:1px solid var(--line); border-radius:11px; color:var(--muted); white-space:nowrap; flex:none; }
+  .ochip:hover { color:var(--text); border-color:var(--faint); }
+  .ochip code { color:var(--text); font-size:11.5px; }
+  .floc { display:flex; align-items:center; gap:6px; min-width:0; flex:0 1 auto; color:var(--muted); white-space:nowrap; }
+  .floc code { color:var(--text); white-space:nowrap; font-size:11.5px; }
+  .floc .sep { color:var(--faint); }
+  .floc .none { color:var(--faint); font-style:italic; }
+  /* A long path loses the middle: the start, with its ~, ellipsizes; the folder's own end always stays. */
+  .wpath { display:flex; min-width:0; }
+  .wpath .h { overflow:hidden; text-overflow:ellipsis; min-width:2.5em; }
+  .wpath .t { flex:none; }
+  .wtag { font-style:normal; font-size:11px; padding:0 8px; border-radius:9px; white-space:nowrap; cursor:help; flex:none; }
+  .wtag.dl { background:var(--accent-soft); color:var(--accent); }
+  .wtag.proj { background:var(--mod-bg); color:var(--mod); }
+
+  /* menus, as in design/tests-tab.html */
+  .menu { position:absolute; z-index:25; padding:6px; background:var(--panel); border:1px solid var(--line); border-radius:9px; box-shadow:0 18px 50px rgba(0,0,0,.35); }
+  .menu .mh { padding:6px 8px 4px; font-size:12px; color:var(--faint); }
+  .menu [role="menuitem"] { display:grid; grid-template-columns:16px 1fr auto; gap:1px 8px; align-items:center; width:100%; padding:6px 8px; border-radius:6px; white-space:nowrap; font-size:13px; }
+  .menu [role="menuitem"]:hover, .menu [role="menuitem"]:focus-visible { background:var(--raised); outline:none; }
+  .menu [role="menuitem"] small { grid-column:2 / -1; color:var(--faint); font-size:11.5px; font-family:"IBM Plex Mono", monospace; overflow:hidden; text-overflow:ellipsis; }
+  .menu [role="menuitem"] small.prose { font-family:"IBM Plex Sans", sans-serif; font-size:12px; }
+  .menu [role="menuitem"] kbd { justify-self:end; }
+  .menu hr { border:0; border-top:1px solid var(--line); margin:6px 2px; }
+  .tmenu { bottom:calc(100% + 4px); left:0; width:220px; }
+
+  /* confirmation dialogs */
+  .scrim { position:absolute; inset:0; z-index:40; display:grid; place-items:center; background:var(--scrim); }
+  .dialog { width:min(440px, 92vw); padding:18px 20px 16px; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 24px 60px rgba(0,0,0,.4); }
+  .dialog h2 { font-size:15px; font-weight:600; letter-spacing:-.01em; }
+  .dialog p { color:var(--muted); margin-top:8px; }
+  .dialog p code { color:var(--text); }
+  .dialog .acts { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+
+  /* ---------- project screen: as design/project-page-many-branches.html and BranchLists.tsx ---------- */
+  .pscreen { flex:1; min-height:0; overflow:auto; padding:40px max(24px, calc(50% - 520px)) 80px; }
+  .back { color:var(--muted); margin:-16px 0 14px -2px; display:block; } .back:hover { color:var(--text); }
+  .phead { display:flex; align-items:start; gap:16px; } .phead > div { flex:1; }
+  .phead h1 { font-size:22px; font-weight:600; letter-spacing:-.02em; }
+  .phead .sub { color:var(--muted); margin-top:4px; }
+  .find { display:flex; align-items:center; gap:12px; margin-top:24px; }
+  .find input { flex:1; padding:8px 12px; border:1px solid var(--line); border-radius:7px; background:var(--panel); }
+  .find input::placeholder { color:var(--faint); }
+  .pseg { display:inline-flex; padding:2px; border-radius:7px; background:var(--panel); border:1px solid var(--line); }
+  .pseg button { padding:5px 11px; border-radius:5px; color:var(--muted); white-space:nowrap; }
+  .pseg button[aria-pressed="true"] { background:var(--raised); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  .pscreen > .hint { margin-top:10px; }
+  .list { list-style:none; padding:0; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+  .list > li { border-top:1px solid var(--line); }
+  .list > li:first-child { border-top:0; border-radius:10px 10px 0 0; }
+  .list > li:last-child { border-radius:0 0 10px 10px; }
+  .list > li:only-child { border-radius:10px; }
+  .brow { position:relative; display:grid; grid-template-columns:minmax(0,1.5fr) 84px 150px 78px 170px 60px 62px; gap:0 14px; align-items:center; padding:11px 46px 11px 16px; }
+  .brow:hover { background:var(--raised); }
+  .brow .name { display:flex; align-items:center; gap:8px; min-width:0; font-family:"IBM Plex Mono", monospace; font-size:12px; font-weight:500; }
+  .brow .name span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .badge { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; border:1px solid var(--line); color:var(--muted); font-family:"IBM Plex Sans", sans-serif; font-weight:400; white-space:nowrap; }
+  .brow .cardk { color:var(--accent); font-family:"IBM Plex Mono", monospace; font-size:12px; }
+  .base { justify-self:start; display:inline-flex; align-items:center; gap:5px; padding:1px 8px; border:1px solid var(--line); border-radius:10px; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .base code { color:var(--text); font-size:11.5px; } .base i { font-style:normal; color:var(--faint); font-size:9px; }
+  .num, .when, .astat { color:var(--muted); font-size:12px; white-space:nowrap; } .when, .astat { text-align:right; }
+  .kebab { position:absolute; top:0; bottom:0; right:0; z-index:10; width:32px; display:grid; place-items:center; border-left:1px solid var(--line); color:var(--muted); }
+  .kebab:hover, .kebab[aria-expanded="true"] { background:var(--bg); color:var(--text); }
+  .kebab:focus-visible { outline-offset:-2px; border-radius:0; }
+  .rmenu { top:calc(100% - 4px); right:4px; width:250px; }
+  .wtrow { display:grid; grid-template-columns:minmax(0,1fr) 110px 200px 150px 76px; gap:4px 14px; align-items:center; padding:10px 16px; }
+  .wtrow .wb { min-width:0; }
+  .wtrow .wb code { display:block; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wtrow .wb small { display:block; font-family:"IBM Plex Mono", monospace; font-size:11.5px; color:var(--faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wtrow .wc { color:var(--muted); font-size:12px; white-space:nowrap; }
+  .wtrow .dirty { color:var(--mod); font-size:12px; white-space:nowrap; }
+  .wtrow .clean { color:var(--faint); font-size:12px; }
+  .wtrow .terms { font-size:12px; color:var(--accent); white-space:nowrap; display:flex; align-items:center; gap:6px; }
+  .wtrow .terms.none { color:var(--faint); }
+  .wtrow .secondary { justify-self:end; }
+  .wtwarn { grid-column:1 / -1; display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; margin-top:6px; padding:7px 10px; border-radius:7px; background:var(--del-bg); color:var(--del); font-size:12px; }
+  .wtwarn span { color:var(--text); }
+  .wtnote { padding:13px 16px; color:var(--muted); }
+  .wtstatus { margin-top:8px; }
+  .integ { display:flex; align-items:center; gap:10px; padding:12px 16px; border:1px solid var(--line); border-radius:10px; color:var(--muted); }
+  .integ code { color:var(--text); padding:1px 8px; border:1px solid var(--line); border-radius:10px; }
+  .integ .linkish { margin-left:auto; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spin { animation-duration:3s; } .cur { animation:none; } .prog.auto i { animation-duration:.01s; }
+  }
+  @media (max-width:1100px) {
+    .rbar .stat, .rbar .sides, .rbar .compare { display:none; }
+    .brow { grid-template-columns:minmax(0,1.5fr) 84px 150px 170px 62px; } .brow .num, .brow .astat { display:none; }
+    .wtrow { grid-template-columns:minmax(0,1fr) 190px 76px; } .wtrow .wc, .wtrow .terms { display:none; }
+    .diffv { grid-template-columns:200px minmax(0,1fr); }
+    .ochip { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- MOCKUP CONTROLS: outside the app frame -->
+<div class="mock" role="region" aria-label="Controles do mockup">
+  <strong>Controles do mockup, fora do app</strong>
+  <div class="seg" role="group" aria-label="Estados na tela da revisão">
+    <span class="sl">Revisão</span>
+    <button type="button" data-set-state="shell" aria-pressed="true">zsh rodando testes</button>
+    <button type="button" data-set-state="claude" aria-pressed="false">Claude Code</button>
+    <button type="button" data-set-state="collapsed" aria-pressed="false">Painel recolhido</button>
+    <button type="button" data-set-state="empty" aria-pressed="false">Sem sessões</button>
+    <button type="button" data-set-state="project-folder" aria-pressed="false">Pasta do projeto</button>
+    <button type="button" data-set-state="create" aria-pressed="false">Criar worktree</button>
+    <button type="button" data-set-state="create-remote" aria-pressed="false">Só no remoto</button>
+    <button type="button" data-set-state="creating" aria-pressed="false">Criando worktree</button>
+    <button type="button" data-set-state="close-shell" aria-pressed="false">Fechar com go test</button>
+    <button type="button" data-set-state="close-claude" aria-pressed="false">Fechar Claude Code</button>
+  </div>
+  <div class="seg" role="group" aria-label="Estados na tela do projeto">
+    <span class="sl">Projeto</span>
+    <button type="button" data-set-state="p-menu" aria-pressed="false">Menu ⋮ da branch</button>
+    <button type="button" data-set-state="p-worktrees" aria-pressed="false">Worktrees do DiffLens</button>
+    <button type="button" data-set-state="p-dirty" aria-pressed="false">Remover com alterações</button>
+    <button type="button" data-set-state="p-busy" aria-pressed="false">Remover com terminal aberto</button>
+    <button type="button" class="variant" data-set-state="p-footer" aria-pressed="false">Variante: rodapé na tela do projeto</button>
+  </div>
+  <button type="button" class="ghost" id="theme">Tema claro</button>
+  <button type="button" class="ghost" id="notes-open" aria-expanded="false" aria-controls="notes">Notas do mockup</button>
+  <span class="note">Interações falsas: abas da revisão, o rodapé inteiro (abas, ×, +, a seta, arrastar a borda do painel, <kbd>⌃`</kbd>), “Criar worktree e abrir”, o ⋮ das branches e “Remover”.</span>
+</div>
+
+<aside class="mnotes" id="notes" aria-label="Notas do mockup" hidden>
+  <button type="button" class="ghost close" id="notes-close">Fechar</button>
+  <h2>O rodapé do terminal</h2>
+  <ul>
+    <li>Uma barra fina no pé da revisão, <b>sempre visível</b>, como uma barra de status. Tem tudo do terminal: a seta que expande e recolhe, uma aba por sessão com o seu ×, o + (“Novo terminal”, “Novo Claude Code”) e, à direita, a pasta e a branch onde as sessões abrem, com a etiqueta.</li>
+    <li><b>Recolhido</b>, só a barra aparece. Clicar numa aba expande o painel nela. O ponto numa aba marca saída nova desde a última vez que você a viu.</li>
+    <li><b>Expandido</b>, o painel cresce para cima a partir da barra; a borda de cima arrasta a altura (ou setas, com o foco nela). A aba mostrada no painel fica ligada a ele pela cor e pela borda.</li>
+    <li><b>Sem sessões</b>, a barra tem só o + e o lugar à direita. Fechar a última aba recolhe o painel.</li>
+    <li><kbd>⌃`</kbd> expande e recolhe; <kbd>⌃⇧`</kbd> abre um novo terminal.</li>
+  </ul>
+  <h2>Onde o terminal abre</h2>
+  <ul>
+    <li><b>A branch já está em checkout em algum lugar:</b> abre lá. Na pasta do projeto, a etiqueta diz “pasta do projeto” e o título dela avisa que os comandos alteram a sua pasta. Numa worktree que você mesmo criou fora do DiffLens, a etiqueta diz “worktree existente” (não desenhado: só muda a etiqueta e o caminho).</li>
+    <li><b>Senão,</b> o rodapé diz “nenhuma pasta ainda”, e o DiffLens oferece criar uma worktree <b>dentro do projeto</b>, em <code>.difflens/worktrees/&lt;branch&gt;</code>, só ao clicar. Barras no nome da branch viram pastas: <code>feature/ABC-200</code> fica em <code>.difflens/worktrees/feature/ABC-200</code>.</li>
+    <li>É a pasta <code>.difflens/</code> que entra no <code>.git/info/exclude</code> do repositório, uma vez, nunca no <code>.gitignore</code>: nada dela aparece no <code>git status</code> da sua pasta e nada vai para um commit.</li>
+    <li><b>Branch só no remoto:</b> a worktree ganha uma branch local com o mesmo nome, que acompanha <code>origin/&lt;branch&gt;</code>.</li>
+    <li>Caminho longo perde o meio: o começo (com o <code>~</code>) é cortado com reticências e o fim da pasta fica sempre inteiro. O caminho completo está no título.</li>
+  </ul>
+  <h2>Sessões</h2>
+  <ul>
+    <li>Shells (“zsh”, “zsh 2”) e Claude Code, com ícone próprio na cor do que um modelo escreve. A aba de um shell com um processo em primeiro plano mostra o nome dele (“· go test”).</li>
+    <li><b>Fechar:</b> o × de uma sessão com processo em primeiro plano (<code>go test</code>, <code>claude</code>) pede confirmação. <b>Um shell ocioso fecha na hora</b>, sem perguntar: experimente o × de “zsh 2”.</li>
+    <li><b>Ciclo de vida:</b> as sessões continuam vivas ao trocar de aba da revisão (clique em Visão geral e Diff) e ao ir para outra revisão. Cada revisão mostra as suas; o rodapé diz quantas seguem abertas em outra revisão (estado “Pasta do projeto”). Ao sair do DiffLens, todas são encerradas.</li>
+  </ul>
+  <h2>Página do projeto</h2>
+  <ul>
+    <li>O ⋮ de cada branch ganha um grupo próprio: “Abrir terminal” e “Abrir no Claude Code”. Abrem a revisão com o painel expandido numa sessão nova; se a branch não estiver em nenhuma pasta, o painel pede para criar a worktree.</li>
+    <li><b>Worktrees do DiffLens:</b> só as que o DiffLens criou. Remover uma limpa é direto; com alterações sem commit, pede confirmação dizendo o que se perde; com terminal aberto nela, é recusado até você fechar os terminais. A branch e os commits dela nunca são tocados.</li>
+    <li><b>Variante a decidir:</b> o mesmo rodapé na página do projeto, abrindo na pasta do projeto (a branch em checkout), com as mesmas sessões que a revisão dessa branch.</li>
+  </ul>
+  <h2>Decisões deste mockup, não combinadas antes</h2>
+  <ul>
+    <li>A seta de expandir fica na ponta esquerda do rodapé, para não andar quando abas abrem e fecham.</li>
+    <li>A linha de lugar que ficava dentro do painel foi para a direita do rodapé; o aviso de “pasta do projeto” foi para o título da etiqueta.</li>
+    <li>O menu ⋮ mostra, sob cada item novo, onde ele vai abrir (o caminho, “na pasta do projeto” ou “pede para criar uma worktree”).</li>
+    <li>A seção Worktrees do DiffLens fica entre as branches e as branches de integração, e só aparece quando há alguma.</li>
+    <li>O que os programas imprimem no terminal fica como eles imprimem, em inglês (git, go test); só o que o Claude escreve está em português, porque a pergunta foi em português.</li>
+  </ul>
+</aside>
+
+<div class="app" id="app">
+  <header class="bar">
+    <div class="logo">
+      <!-- The app's logo, as in src/app/TopBar.tsx: fixed colours, the same in both themes. -->
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect width="20" height="20" rx="4.5" fill="#052e35"/><rect x="0.5" y="0.5" width="19" height="19" rx="4" fill="none" stroke="#fce7cc" stroke-opacity="0.16"/><g fill="none" stroke="#fce7cc" stroke-linecap="round"><circle cx="9.5" cy="9.5" r="5.75" stroke-width="1.5"/><path d="M14 14l2 2" stroke-width="2"/></g><rect x="6" y="7" width="7" height="2" rx="1" fill="#f65751"/><rect x="6" y="10" width="7" height="2" rx="1" fill="#54d8a3"/></svg>
+      DiffLens
+    </div>
+    <nav class="crumb" id="crumb" aria-label="Onde você está"></nav>
+    <div class="rbar" id="rbar"></div>
+    <div class="spacer" id="pspacer"></div>
+    <span class="ghost">Preferências</span>
+  </header>
+
+  <!-- ===================== REVIEW SCREEN ===================== -->
+  <div class="rscreen" id="rscreen">
+    <nav class="tabs" role="tablist" aria-label="Visões da revisão">
+      <button type="button" class="tab" role="tab" data-view="Overview" aria-selected="false">Visão geral</button>
+      <span class="tab" role="tab" aria-selected="false">Flow</span>
+      <button type="button" class="tab" role="tab" data-view="Diff" aria-selected="true">Diff</button>
+      <span class="tab" role="tab" aria-selected="false">Testes<span class="count">1 falhando</span></span>
+      <span class="tab" role="tab" aria-selected="false">Qualidade</span>
+      <span class="tab" role="tab" aria-selected="false">Insights<span class="count ai">2 achados</span></span>
+      <span class="tab" role="tab" aria-selected="false" aria-disabled="true" title="Chega em uma próxima etapa">Executar</span>
+      <span class="rprog"><span>4 de 12 arquivos revisados</span><span class="pbar"><i></i></span></span>
+    </nav>
+
+    <div class="views" id="views">
+      <!-- Diff tab, static: only there so the terminal sits under a real review. -->
+      <div class="diffv" id="view-diff">
+        <aside class="files" aria-label="Arquivos alterados">
+          <input type="search" placeholder="Filtrar arquivos" aria-label="Filtrar arquivos">
+          <ul>
+            <li class="on"><span class="fs m">M</span><span class="fp"><span class="dir">internal/auth/</span>refresh.go</span><span class="st"><span class="a">+64</span> <span class="d">−18</span></span></li>
+            <li><span class="fs m">M</span><span class="fp"><span class="dir">internal/auth/</span>refresh_test.go</span><span class="st"><span class="a">+121</span> <span class="d">−9</span></span></li>
+            <li><span class="fs a">A</span><span class="fp"><span class="dir">internal/auth/</span>token_store.go</span><span class="st"><span class="a">+88</span> <span class="d">−0</span></span></li>
+            <li><span class="fs m">M</span><span class="fp"><span class="dir">internal/http/middleware/</span>session.go</span><span class="st"><span class="a">+37</span> <span class="d">−12</span></span></li>
+            <li><span class="fs m">M</span><span class="fp"><span class="dir">internal/http/middleware/</span>session_test.go</span><span class="st"><span class="a">+54</span> <span class="d">−6</span></span></li>
+            <li><span class="fs a">A</span><span class="fp"><span class="dir">internal/store/postgres/</span>refresh_tokens.go</span><span class="st"><span class="a">+71</span> <span class="d">−0</span></span></li>
+            <li><span class="fs a">A</span><span class="fp"><span class="dir">migrations/</span>0042_refresh_tokens.sql</span><span class="st"><span class="a">+19</span> <span class="d">−0</span></span></li>
+            <li><span class="fs m">M</span><span class="fp"><span class="dir">internal/config/</span>config.go</span><span class="st"><span class="a">+6</span> <span class="d">−1</span></span></li>
+          </ul>
+        </aside>
+        <section class="hunkv" aria-label="Diff de internal/auth/refresh.go">
+          <header class="fh"><code>internal/auth/refresh.go</code><span class="stat mono"><span class="a">+64</span> <span class="d">−18</span></span></header>
+          <div class="code">
+            <div class="hh">@@ -40,10 +40,14 @@ func (s *Service) Refresh(ctx context.Context, raw string) (Token, error) {</div>
+            <div class="ln ctx"><i>40</i><i>40</i><span><span class="k">func</span> (s *<span class="ty">Service</span>) Refresh(ctx <span class="ty">context.Context</span>, raw <span class="ty">string</span>) (<span class="ty">Token</span>, <span class="ty">error</span>) {</span></div>
+            <div class="ln ctx"><i>41</i><i>41</i><span>	claims, err := s.parse(raw)</span></div>
+            <div class="ln ctx"><i>42</i><i>42</i><span>	<span class="k">if</span> err != <span class="k">nil</span> {</span></div>
+            <div class="ln ctx"><i>43</i><i>43</i><span>		<span class="k">return</span> <span class="ty">Token</span>{}, fmt.Errorf(<span class="s">"parse refresh token: %w"</span>, err)</span></div>
+            <div class="ln ctx"><i>44</i><i>44</i><span>	}</span></div>
+            <div class="ln del"><i>45</i><i></i><span>	<span class="k">if</span> time.Now().After(claims.ExpiresAt) {</span></div>
+            <div class="ln add"><i></i><i>45</i><span>	deadline := claims.ExpiresAt.Add(s.grace)</span></div>
+            <div class="ln add"><i></i><i>46</i><span>	<span class="k">if</span> s.now().After(deadline) {</span></div>
+            <div class="ln ctx"><i>46</i><i>47</i><span>		<span class="k">return</span> <span class="ty">Token</span>{}, ErrRefreshExpired</span></div>
+            <div class="ln ctx"><i>47</i><i>48</i><span>	}</span></div>
+            <div class="ln add"><i></i><i>49</i><span>	<span class="k">if</span> err := s.store.Revoke(ctx, claims.ID); err != <span class="k">nil</span> {</span></div>
+            <div class="ln add"><i></i><i>50</i><span>		<span class="k">return</span> <span class="ty">Token</span>{}, fmt.Errorf(<span class="s">"revoke refresh token %s: %w"</span>, claims.ID, err)</span></div>
+            <div class="ln add"><i></i><i>51</i><span>	}</span></div>
+            <div class="ln ctx"><i>48</i><i>52</i><span>	<span class="k">return</span> s.issue(ctx, claims.Subject)</span></div>
+            <div class="ln ctx"><i>49</i><i>53</i><span>}</span></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Overview tab, static. -->
+      <div class="ov" id="view-ov" hidden>
+        <h1>Renovação do token dentro de uma janela de tolerância</h1>
+        <p class="by"><em class="t-ai">Modelo</em><span>Claude Code nesta máquina, há 1 h</span></p>
+        <p class="prose">O refresh passa a aceitar tokens vencidos há até 5 minutos, revoga o refresh token usado e grava os novos no Postgres. O middleware de sessão renova o token quando faltam menos de 2 minutos para ele vencer.</p>
+        <h2 class="sect">Onde olhar primeiro</h2>
+        <ol class="look">
+          <li><span class="rk">1</span><span><strong>TestSessionMiddleware_RefreshesNearExpiry falha</strong><span class="dt">O middleware recusa com 401 um token que ainda está dentro da janela.</span></span></li>
+          <li><span class="rk">2</span><span><strong>Revoke e issue não estão na mesma transação</strong><span class="dt">Se issue falhar, o refresh token já foi revogado e o usuário perde a sessão.</span></span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PROJECT SCREEN ===================== -->
+  <main class="pscreen" id="pscreen" hidden>
+    <p class="mocknote inline" id="variant-note" hidden><b>Variante a decidir:</b> o rodapé do terminal também na página do projeto, abrindo na pasta do projeto (a branch em checkout, <code>feature/ABC-203</code>). Clique na aba “zsh” para expandir.</p>
+    <button type="button" class="back">← Todos os projetos</button>
+    <div class="phead">
+      <div><h1>acme-api</h1><p class="sub"><code>~/code/acme-api</code> · Go · 43 branches</p></div>
+      <button type="button" class="secondary">Configurações do projeto</button>
+    </div>
+    <div class="find">
+      <input type="search" placeholder="Filtre por branch ou card, como ABC-123" aria-label="Filtrar branches">
+      <div class="pseg" role="group" aria-label="Branches a listar"><button type="button" aria-pressed="false">Nesta máquina</button><button type="button" aria-pressed="true">Também no remoto</button></div>
+    </div>
+    <p class="hint">Cada branch é comparada com a sua própria base: a branch de integração mais próxima no histórico dela, a menos que você tenha escolhido outra. Clique em uma base para mudá-la.</p>
+
+    <h2 class="sect">Em checkout</h2>
+    <ul class="list" id="rows-current"></ul>
+
+    <h2 class="sect">Ativas <small>com commits nos últimos 14 dias</small></h2>
+    <ul class="list" id="rows-active"></ul>
+
+    <section id="wts" aria-labelledby="wts-t"></section>
+
+    <h2 class="sect">Branches de integração <small>usadas como base, nunca listadas para revisão</small></h2>
+    <div class="integ"><code>develop</code><code>master</code><button type="button" class="linkish">Alterar nas Configurações do projeto</button></div>
+  </main>
+
+  <!-- The terminal: the expanded panel, then the footer bar under it. Both drawn by render() from the model below. -->
+  <section class="term" id="term" aria-label="Terminal"></section>
+  <footer class="foot" id="foot" aria-label="Terminal"></footer>
+
+  <div id="modal"></div>
+  <div id="mocknote"></div>
+</div>
+
+<script>
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const BT = "`";
+  const KEY_TOGGLE = "⌃" + BT, KEY_NEW = "⌃⇧" + BT;
+
+  const ICON = {
+    sh: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="1" y="2" width="12" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M3.8 5.2 5.8 7l-2 1.8M7.2 9h3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    // A plain four-point spark, in the colour of what a model wrote: a generic mark, not anyone's logo.
+    cc: '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.2 8.1 5.9 12.8 7 8.1 8.1 7 12.8 5.9 8.1 1.2 7 5.9 5.9Z" fill="currentColor"/></svg>',
+    x: '<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2l6 6M8 2 2 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+    plus: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    down: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    up: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 7.5 6 4l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    folder: '<svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.5 3.5a1 1 0 0 1 1-1h3l1.3 1.5h4.7a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>',
+    branch: '<svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true"><circle cx="4" cy="3" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="4" cy="11" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="10.5" cy="4.5" r="1.5" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M4 4.5v5M10.5 6c0 2.5-6.5 1.5-6.5 3.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>',
+    kebab: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="3.5" r="1.3" fill="currentColor"/><circle cx="8" cy="8" r="1.3" fill="currentColor"/><circle cx="8" cy="12.5" r="1.3" fill="currentColor"/></svg>',
+  };
+
+  const HOME = "~/code/acme-api";
+  const CHECKED_OUT = "feature/ABC-203"; // the branch in checkout in the project folder
+  const wtRel = (b) => `.difflens/worktrees/${b}`;
+  const wtPath = (b) => `${HOME}/${wtRel(b)}`;
+  const n = (v) => v.toLocaleString("pt-BR");
+
+  // The branches of the project: what the review bar and the branch rows show.
+  const BRANCHES = {
+    "feature/ABC-203": { card: "ABC-203", base: "develop", commits: 3, stat: [7, 214, 31], sha: "c90e7d4", pr: null, when: "21 nov" },
+    "feature/ABC-200": { card: "ABC-200", base: "develop", commits: 5, stat: [12, 486, 73], sha: "a41c9e2", pr: "PR #48", when: "20 nov", analysis: "Analisado" },
+    "feature/ABC-198": { card: "ABC-198", base: "develop", commits: 2, stat: [4, 97, 12], sha: "5be21f0", pr: "PR #45", when: "19 nov", remote: true },
+    "feature/ABC-195": { card: "ABC-195", base: "develop", commits: 6, stat: [15, 733, 128], sha: "e17a3b8", pr: null, when: "18 nov" },
+    "feature/ABC-171": { card: "ABC-171", base: "develop", commits: 9, stat: [21, 1102, 245], sha: "0d4c6aa", pr: "PR #32", when: "12 nov" },
+  };
+
+  // ---------- what the sessions print ----------
+  const CURSOR = '<span class="cur" aria-hidden="true"></span>';
+  const P = (dir) => `<span class="t-p">carlos@mbp ${dir} %</span> `;
+  const dirOf = (branch, where) => (where === "project" ? "acme-api" : branch.split("/").pop());
+
+  const OUT = {
+    goTest: () => [
+      P("ABC-200") + "git status",
+      "On branch feature/ABC-200",
+      "Your branch is up to date with 'origin/feature/ABC-200'.",
+      "",
+      "Changes not staged for commit:",
+      '  (use "git add &lt;file&gt;..." to update what will be committed)',
+      '  (use "git restore &lt;file&gt;..." to discard changes in working directory)',
+      '        <span class="t-r">modified:   internal/auth/refresh.go</span>',
+      '        <span class="t-r">modified:   internal/auth/refresh_test.go</span>',
+      '        <span class="t-r">modified:   internal/http/middleware/session.go</span>',
+      "",
+      'no changes added to commit (use "git add" and/or "git commit -a")',
+      P("ABC-200") + "go test ./...",
+      "?       acme-api/cmd/acme-api                   [no test files]",
+      '<span class="t-g">ok</span>      acme-api/internal/audit                 0.214s',
+      '<span class="t-g">ok</span>      acme-api/internal/auth                  1.906s',
+      '<span class="t-g">ok</span>      acme-api/internal/config                0.087s',
+      '<span class="t-r">--- FAIL: TestSessionMiddleware_RefreshesNearExpiry (0.03s)</span>',
+      "    session_test.go:88: expected status 200, got 401",
+      '<span class="t-r">FAIL</span>',
+      '<span class="t-r">FAIL</span>    acme-api/internal/http/middleware       0.412s',
+      '<span class="t-g">ok</span>      acme-api/internal/ratelimit             0.640s',
+      CURSOR,
+    ].join("\n"),
+    gitLog: () => [
+      P("ABC-200") + "git log --oneline -4",
+      '<span class="t-y">a41c9e2</span> <span class="t-y">(</span><span class="t-p t-b">HEAD -&gt; </span><span class="t-g t-b">feature/ABC-200</span><span class="t-y">, </span><span class="t-r t-b">origin/feature/ABC-200</span><span class="t-y">)</span> ABC-200: renew the token within the grace window',
+      '<span class="t-y">7d02b1f</span> ABC-200: store refresh tokens in postgres',
+      '<span class="t-y">3c9a54e</span> ABC-200: add the refresh_tokens migration',
+      '<span class="t-y">b81f0d2</span> <span class="t-y">(</span><span class="t-r t-b">origin/develop</span><span class="t-y">)</span> Merge pull request #41 from feature/ABC-190',
+      P("ABC-200") + CURSOR,
+    ].join("\n"),
+    status3003: () => [
+      P("acme-api") + "git branch --show-current",
+      "feature/ABC-203",
+      P("acme-api") + CURSOR,
+    ].join("\n"),
+    claudeBox: (path) => `<span class="cc-box"><span class="t-b">Claude Code</span><span class="t-dim">/help for help, /status for your current setup</span><span class="t-dim">cwd: ${path}</span></span>`,
+    claudeInput: () => `<span class="cc-in">&gt; ${CURSOR}</span><span class="t-dim">  ? for shortcuts</span>`,
+    claudeConv: (path) => OUT.claudeBox(path) + [
+      '<span class="t-dim">&gt; o TestSessionMiddleware_RefreshesNearExpiry quebrou nesta branch. descobre por quê e corrige</span>',
+      "",
+      '<span class="t-m">●</span> Read(internal/http/middleware/session.go)',
+      '<span class="t-m">●</span> Read(internal/auth/refresh.go)',
+      '<span class="t-m">●</span> O middleware compara o vencimento com time.Now() antes de aplicar a janela de tolerância,',
+      "  então um token que ainda está dentro da janela volta 401.",
+      '<span class="t-m">●</span> Update(internal/http/middleware/session.go)',
+      '  <span class="t-dim">└ Updated with 4 additions and 2 removals</span>',
+      '<span class="t-m">●</span> Bash(go test ./internal/http/middleware/...)',
+      '  <span class="t-dim">└</span> <span class="t-g">ok</span>  acme-api/internal/http/middleware  0.398s',
+      '<span class="t-m">●</span> Passou. A checagem de vencimento agora vem depois da janela, em session.go:71.',
+      "  Não fiz commit: as alterações estão na worktree para você revisar.",
+    ].join("\n") + OUT.claudeInput(),
+    claudeNew: (path) => OUT.claudeBox(path) + OUT.claudeInput(),
+  };
+
+  // ---------- the model of the mockup: reset by each state of the switcher ----------
+  let M;
+  let seq = 10;
+  const sess = (id, kind, name, running, body, activity = false) => ({ id, kind, name, running, body, activity });
+
+  function baseModel() {
+    return {
+      screen: "review",
+      branch: "feature/ABC-200",
+      view: "Diff",
+      panel: "open", // open | collapsed | create | creating
+      pending: "shell", // what the panel opens once the worktree exists
+      auto: false, // the creation was started by a click, so it finishes by itself
+      projectFooter: false, // the variant with the footer on the project screen
+      height: 300,
+      addMenu: false,
+      modal: null,
+      returnKey: null,
+      rowMenu: null,
+      busyWarn: null,
+      removedMsg: null,
+      // Where each branch is checked out: "wt" (a worktree DiffLens created), "project" (the project folder) or none.
+      where: { "feature/ABC-200": "wt", "feature/ABC-203": "project", "feature/ABC-198": null, "feature/ABC-195": "wt", "feature/ABC-171": "wt" },
+      sessions: {
+        "feature/ABC-200": [
+          sess("s1", "shell", "zsh", "go test ./...", OUT.goTest()),
+          sess("s2", "shell", "zsh 2", null, OUT.gitLog()),
+          sess("s3", "claude", "Claude Code", "claude", OUT.claudeConv(wtPath("feature/ABC-200")), true),
+        ],
+        "feature/ABC-203": [],
+        "feature/ABC-198": [],
+        "feature/ABC-195": [],
+        "feature/ABC-171": [],
+      },
+      active: { "feature/ABC-200": "s1" },
+      worktrees: [
+        { branch: "feature/ABC-200", created: "há 2 dias", dirty: 3, files: [] },
+        { branch: "feature/ABC-195", created: "ontem", dirty: 0, files: [] },
+        { branch: "feature/ABC-171", created: "há 9 dias", dirty: 1, files: ["internal/billing/invoice.go"] },
+      ],
+    };
+  }
+
+  const withProjectSession = (m) => {
+    m.sessions[CHECKED_OUT] = [sess("s4", "shell", "zsh", null, OUT.status3003())];
+    m.active[CHECKED_OUT] = "s4";
+    return m;
+  };
+
+  const STATES = {
+    shell: (m) => m,
+    claude: (m) => { m.active[m.branch] = "s3"; find(m, "s3").activity = false; find(m, "s1").activity = true; return m; },
+    collapsed: (m) => { m.panel = "collapsed"; return m; },
+    empty: (m) => { m.sessions[m.branch] = []; m.panel = "collapsed"; return m; },
+    "project-folder": (m) => { m.branch = CHECKED_OUT; return withProjectSession(m); },
+    create: (m) => firstTime(m, "feature/ABC-200"),
+    "create-remote": (m) => firstTime(m, "feature/ABC-198"),
+    creating: (m) => { firstTime(m, "feature/ABC-200"); m.panel = "creating"; return m; },
+    "close-shell": (m) => { m.modal = { type: "close", id: "s1" }; m.returnKey = "close-s1"; return m; },
+    "close-claude": (m) => { m.active[m.branch] = "s3"; find(m, "s3").activity = false; m.modal = { type: "close", id: "s3" }; m.returnKey = "close-s3"; return m; },
+    "p-menu": (m) => { m.screen = "project"; m.rowMenu = "feature/ABC-200"; return m; },
+    "p-worktrees": (m) => { m.screen = "project"; m.scrollTo = "wts"; return m; },
+    "p-dirty": (m) => { m.screen = "project"; m.scrollTo = "wts"; m.modal = { type: "remove", branch: "feature/ABC-171" }; m.returnKey = "rm-feature/ABC-171"; return m; },
+    "p-busy": (m) => { m.screen = "project"; m.scrollTo = "wts"; m.busyWarn = "feature/ABC-200"; return m; },
+    "p-footer": (m) => { m.screen = "project"; m.projectFooter = true; m.panel = "collapsed"; return withProjectSession(m); },
+  };
+
+  // The first time a terminal is asked for on a branch that is in no folder: no worktree and no sessions yet.
+  function firstTime(m, branch) {
+    m.branch = branch;
+    m.where[branch] = null;
+    m.sessions[branch] = [];
+    m.worktrees = m.worktrees.filter((w) => w.branch !== branch);
+    m.panel = "create";
+    m.pending = "shell";
+    return m;
+  }
+
+  function find(m, id) {
+    for (const list of Object.values(m.sessions)) { const s = list.find((x) => x.id === id); if (s) return s; }
+    return null;
+  }
+  // Whose sessions the footer shows: the review's branch, or on the project screen the branch in the project folder.
+  const here = () => (M.screen === "review" ? M.branch : CHECKED_OUT);
+  const sessionsHere = () => M.sessions[here()] || [];
+  const footerShown = () => M.screen === "review" || M.projectFooter;
+
+  function addSession(branch, kind) {
+    const list = M.sessions[branch];
+    const same = list.filter((s) => s.kind === kind).length;
+    const label = kind === "claude" ? "Claude Code" : "zsh";
+    const name = same === 0 ? label : `${label} ${same + 1}`;
+    const where = M.where[branch];
+    const path = where === "wt" ? wtPath(branch) : HOME;
+    const id = "s" + ++seq;
+    const body = kind === "claude" ? OUT.claudeNew(path) : P(dirOf(branch, where)) + CURSOR;
+    list.push(sess(id, kind, name, kind === "claude" ? "claude" : null, body));
+    M.active[branch] = id;
+    return id;
+  }
+
+  function closeSession(id) {
+    const key = here();
+    const list = M.sessions[key];
+    const i = list.findIndex((s) => s.id === id);
+    if (i < 0) return;
+    list.splice(i, 1);
+    if (M.active[key] === id) {
+      const next = list[i] || list[i - 1];
+      M.active[key] = next ? next.id : null;
+      if (next && M.panel === "open") next.activity = false; // it is now on screen, so its output has been seen
+    }
+    if (!list.length) M.panel = "collapsed"; // closing the last tab leaves only the bar
+  }
+
+  // ---------- rendering ----------
+  function renderBar() {
+    const review = M.screen === "review";
+    $("#crumb").innerHTML = `<span class="c">Projetos</span><span aria-hidden="true">/</span><span class="c">acme-api</span>`
+      + (review ? `<span aria-hidden="true">/</span><span class="c mono">${M.branch}</span>` : "");
+    $("#pspacer").hidden = review;
+    const bar = $("#rbar");
+    bar.hidden = !review;
+    if (!review) return;
+    const b = BRANCHES[M.branch];
+    bar.innerHTML = `
+      <span class="compare mono" title="${M.branch} para ${b.base}"><span>${M.branch}</span><span class="into">→</span><span>${b.base}</span></span>
+      <span class="stat mono">${b.stat[0]} arquivos <span class="a">+${n(b.stat[1])}</span> <span class="d">−${n(b.stat[2])}</span></span>
+      <a class="ext card" href="#" onclick="return false">${b.card}</a>
+      ${b.pr ? `<a class="ext" href="#" onclick="return false">${b.pr}<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 1.5h5v5M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></a>` : ""}
+      <span class="spacer"></span>
+      <span class="sides"><i></i><span>Em <code>${b.sha}</code></span></span>
+      <button type="button" class="outline">Recarregar</button>`;
+  }
+
+  function renderViews() {
+    $$(".tabs [data-view]").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.view === M.view)));
+    $("#view-diff").hidden = M.view !== "Diff";
+    $("#view-ov").hidden = M.view !== "Overview";
+  }
+
+  function tabHTML(s, active) {
+    const on = s.id === active;
+    const shown = on && M.panel === "open";
+    const proc = s.kind === "shell" && s.running ? s.running.split(" ").slice(0, 2).join(" ") : "";
+    const aria = s.name + (proc ? `, rodando ${s.running}` : "") + (s.activity && !shown ? ", saída nova" : "");
+    return `<div class="ttab${on ? " on" : ""}" role="presentation">
+      <button type="button" role="tab" class="tl" id="tab-${s.id}" aria-selected="${on}" aria-controls="term" tabindex="${on ? 0 : -1}"
+        aria-label="${aria}" title="${aria}" data-act="tab" data-id="${s.id}" data-key="tab-${s.id}">
+        <span class="ico${s.kind === "claude" ? " cc" : ""}">${s.kind === "claude" ? ICON.cc : ICON.sh}</span><span>${s.name}</span>${proc ? `<span class="proc">${proc}</span>` : ""}${s.activity && !shown ? '<span class="adot" aria-hidden="true"></span>' : ""}
+      </button>
+      <button type="button" class="tx" data-act="close" data-id="${s.id}" data-key="close-${s.id}" aria-label="Fechar ${s.name}" title="Fechar ${s.name}">${ICON.x}</button>
+    </div>`;
+  }
+
+  function pendingTabHTML() {
+    const cc = M.pending === "claude";
+    const name = cc ? "Claude Code" : "zsh";
+    return `<div class="ttab pending on" role="presentation">
+      <span class="tl" role="tab" aria-selected="true" aria-controls="term" title="${name}, esperando a worktree"><span class="ico${cc ? " cc" : ""}">${cc ? ICON.cc : ICON.sh}</span><span>${name}</span></span>
+      <button type="button" class="tx" data-act="cancel-create" data-key="cancel-pending" aria-label="Cancelar ${name}" title="Cancelar">${ICON.x}</button>
+    </div>`;
+  }
+
+  // Where the sessions open, at the right of the footer. The path is split so a long one loses its middle, never its ~.
+  function locHTML(key) {
+    const w = M.where[key];
+    if (!w) {
+      return `<span class="floc" title="A branch ${key} não está em checkout em nenhuma pasta"><span class="ico">${ICON.folder}</span><span class="none">nenhuma pasta ainda</span><span class="sep" aria-hidden="true">·</span><span class="ico">${ICON.branch}</span><code>${key}</code></span>`;
+    }
+    const [head, tail] = w === "wt" ? [HOME + "/", wtRel(key)] : ["~/code/", "acme-api"];
+    const tag = w === "wt"
+      ? '<em class="wtag dl" title="Criada pelo DiffLens dentro do projeto; a pasta .difflens/ está no .git/info/exclude. Você a remove na página do projeto.">worktree do DiffLens</em>'
+      : '<em class="wtag proj" title="A branch já está em checkout na pasta do projeto, por isso o terminal abre lá. Os comandos aqui alteram a sua pasta do projeto.">pasta do projeto</em>';
+    return `<span class="floc">
+      <span class="ico" title="Pasta">${ICON.folder}</span><code class="wpath" title="${head}${tail}"><span class="h">${head}</span><span class="t">${tail}</span></code>
+      <span class="sep" aria-hidden="true">·</span>
+      <span class="ico" title="Branch">${ICON.branch}</span><code>${key}</code>${tag}
+    </span>`;
+  }
+
+  function otherChipHTML(key) {
+    const other = Object.entries(M.sessions).find(([b, list]) => b !== key && list.length);
+    if (!other) return "";
+    const [b, list] = other;
+    const title = `${list.map((s) => s.name).join(", ")}: continuam rodando na revisão de ${b}. Clique para ir até ela.`;
+    return `<button type="button" class="ochip" data-act="goto" data-branch="${b}" data-key="ochip" title="${title}">${list.length} ${list.length === 1 ? "sessão" : "sessões"} em <code>${b}</code></button>`;
+  }
+
+  function renderFoot() {
+    const foot = $("#foot");
+    foot.hidden = !footerShown();
+    if (foot.hidden) { foot.innerHTML = ""; return; }
+    const key = here();
+    const list = sessionsHere();
+    const pending = M.panel === "create" || M.panel === "creating";
+    const expanded = M.panel !== "collapsed";
+    foot.classList.toggle("open", expanded);
+    const anything = pending || list.length > 0;
+    const chev = anything
+      ? `<button type="button" class="ticon chev" data-act="toggle" data-key="chev" aria-expanded="${expanded}" aria-controls="term"
+          aria-label="${expanded ? "Recolher o terminal" : "Expandir o terminal"}" title="${expanded ? "Recolher" : "Expandir"} o terminal (${KEY_TOGGLE}). As sessões continuam rodando.">${expanded ? ICON.down : ICON.up}</button>`
+      : "";
+    const tabs = anything
+      ? `<div class="ftabs" role="tablist" aria-label="Sessões do terminal">${pending ? pendingTabHTML() : list.map((s) => tabHTML(s, M.active[key])).join("")}</div>`
+      : "";
+    const add = pending ? "" : `<div class="addwrap">
+        <button type="button" class="ticon" data-act="addmenu" data-key="add" aria-haspopup="menu" aria-expanded="${M.addMenu}" aria-controls="addmenu" aria-label="Nova sessão" title="Nova sessão">${ICON.plus}</button>
+        <div class="menu tmenu" id="addmenu" role="menu" aria-label="Nova sessão"${M.addMenu ? "" : " hidden"}>
+          <button type="button" role="menuitem" data-act="new" data-kind="shell" data-key="new-shell"><span class="ico">${ICON.sh}</span><span>Novo terminal</span><kbd>${KEY_NEW}</kbd></button>
+          <button type="button" role="menuitem" data-act="new" data-kind="claude" data-key="new-claude"><span class="ico cc">${ICON.cc}</span><span>Novo Claude Code</span></button>
+        </div>
+      </div>`;
+    foot.innerHTML = `${chev}${tabs}${add}<span class="tspacer"></span>${otherChipHTML(key)}${locHTML(key)}`;
+  }
+
+  function createHTML() {
+    const branch = M.branch;
+    const remote = BRANCHES[branch].remote;
+    const what = M.pending === "claude" ? "o Claude Code" : "um terminal";
+    const p = wtRel(branch);
+    const explain = remote
+      ? `Cria a worktree em <code>${p}</code> com uma branch local <code>${branch}</code> que acompanha <code>origin/${branch}</code>. A pasta <code>.difflens/</code> entra no <code>.git/info/exclude</code>; sua pasta do projeto não é alterada.`
+      : `Cria a worktree em <code>${p}</code> com a branch <code>${branch}</code>. A pasta <code>.difflens/</code> entra no <code>.git/info/exclude</code>; sua pasta do projeto não é alterada.`;
+    return `<div class="tcreate"><div>
+      <h3>A branch <code>${branch}</code> não está em nenhuma pasta</h3>
+      <p>${remote ? "Ela só existe no remoto. " : ""}Para abrir ${what} nela, o DiffLens cria uma worktree dentro do projeto.</p>
+      <p class="cwhat">${explain}</p>
+      <div class="cacts">
+        <button type="button" class="primary" data-act="create" data-key="create">Criar worktree e abrir</button>
+        <button type="button" class="secondary" data-act="cancel-create">Cancelar</button>
+      </div>
+      <p class="hint">Ela aparece em Worktrees do DiffLens, na página do projeto, onde você pode removê-la.</p>
+    </div></div>`;
+  }
+
+  function creatingHTML() {
+    const branch = M.branch;
+    const remote = BRANCHES[branch].remote;
+    return `<div class="tcreate" role="status" aria-live="polite"><div>
+      <h3><span class="spin" aria-hidden="true"></span>Criando a worktree de <code>${branch}</code></h3>
+      <ol class="steps">
+        <li class="done"><span class="mk" aria-label="feito">✓</span><span>A pasta <code>.difflens/</code> entrou no <code>.git/info/exclude</code></span></li>
+        ${remote ? `<li class="done"><span class="mk" aria-label="feito">✓</span><span>Branch local <code>${branch}</code> criada, acompanhando <code>origin/${branch}</code></span></li>` : ""}
+        <li class="now"><span class="spin" aria-hidden="true"></span><span><code>git worktree add ${wtRel(branch)}</code> <span class="faint">preparando os arquivos, 1.284 de 3.902</span></span></li>
+        <li class="todo"><span class="mk" aria-hidden="true">○</span><span>Abrir ${M.pending === "claude" ? "o Claude Code" : "o zsh"} na worktree</span></li>
+      </ol>
+      <div class="prog${M.auto ? " auto" : ""}" role="progressbar" aria-label="Arquivos preparados" aria-valuemin="0" aria-valuemax="3902" aria-valuenow="1284"><i></i></div>
+    </div></div>`;
+  }
+
+  // The expanded panel, above the footer: the active session, or the worktree to create.
+  function renderTerm() {
+    const term = $("#term");
+    term.hidden = !footerShown() || M.panel === "collapsed";
+    if (term.hidden) { term.innerHTML = ""; return; }
+    term.style.height = M.height + "px";
+    let body;
+    if (M.panel === "create") body = createHTML();
+    else if (M.panel === "creating") body = creatingHTML();
+    else {
+      const list = sessionsHere();
+      const s = list.find((x) => x.id === M.active[here()]) || list[0];
+      body = `<div class="tbody" role="tabpanel" aria-labelledby="tab-${s.id}" tabindex="0" data-key="tbody">${s.body}</div>`;
+    }
+    term.innerHTML = `<div class="grip" role="separator" aria-orientation="horizontal" aria-label="Altura do terminal" tabindex="0"
+        aria-valuemin="140" aria-valuemax="${maxHeight()}" aria-valuenow="${M.height}" data-key="grip" title="Arraste para mudar a altura"></div>${body}`;
+    const tb = $(".tbody", term);
+    if (tb) tb.scrollTop = tb.scrollHeight;
+  }
+
+  const maxHeight = () => Math.max(160, ($("#app").clientHeight || 700) - 46 - 32 - 130);
+
+  // ---------- project screen ----------
+  function whereHint(branch) {
+    const w = M.where[branch];
+    if (w === "wt") return `<small>${wtRel(branch)}</small>`;
+    if (w === "project") return '<small class="prose">na pasta do projeto</small>';
+    return '<small class="prose">pede para criar uma worktree</small>';
+  }
+
+  function rowHTML(name) {
+    const b = BRANCHES[name];
+    const open = M.rowMenu === name;
+    return `<li class="brow">
+      <span class="name"><span>${name}</span>${b.remote ? '<em class="badge" title="Só no remoto: não existe branch local.">só no remoto</em>' : ""}</span>
+      <span class="cardk">${b.card}</span>
+      <span class="base">para <code>${b.base}</code><i>▼</i></span>
+      <span class="num">${b.commits} commits</span>
+      <span class="stat mono">${b.stat[0]} arquivos <span class="a">+${n(b.stat[1])}</span> <span class="d">−${n(b.stat[2])}</span></span>
+      <span class="astat">${b.analysis || ""}</span>
+      <span class="when">${b.when}</span>
+      <button type="button" class="kebab" data-act="rowmenu" data-branch="${name}" data-key="kebab-${name}" aria-haspopup="menu" aria-expanded="${open}" aria-controls="rmenu-${name}" aria-label="Ações de ${name}" title="Ações de ${name}">${ICON.kebab}</button>
+      <div class="menu rmenu" id="rmenu-${name}" role="menu" aria-label="Ações de ${name}"${open ? "" : " hidden"}>
+        <button type="button" role="menuitem" data-act="noop"><span></span><span>Análise completa…</span></button>
+        <hr>
+        <p class="mh">Abrir a revisão em</p>
+        <button type="button" role="menuitem" data-act="open-view" data-branch="${name}" data-view="Overview"><span></span><span>Visão geral</span></button>
+        <button type="button" role="menuitem" data-act="noop"><span></span><span>Testes</span></button>
+        <button type="button" role="menuitem" data-act="noop"><span></span><span>Insights</span></button>
+        <button type="button" role="menuitem" data-act="noop"><span></span><span>Comentários</span></button>
+        <hr>
+        <button type="button" role="menuitem" data-act="open-with" data-kind="shell" data-branch="${name}"><span class="ico">${ICON.sh}</span><span>Abrir terminal</span>${whereHint(name)}</button>
+        <button type="button" role="menuitem" data-act="open-with" data-kind="claude" data-branch="${name}"><span class="ico cc">${ICON.cc}</span><span>Abrir no Claude Code</span>${whereHint(name)}</button>
+      </div>
+    </li>`;
+  }
+
+  function wtRowHTML(w) {
+    const terms = M.where[w.branch] === "wt" ? (M.sessions[w.branch] || []) : [];
+    const state = w.dirty
+      ? `<span class="dirty">alterações sem commit: ${w.dirty} ${w.dirty === 1 ? "arquivo" : "arquivos"}</span>`
+      : '<span class="clean">limpa</span>';
+    const termsCell = terms.length
+      ? `<span class="terms" title="${terms.map((s) => s.name).join(", ")}">${ICON.sh}${terms.length} ${terms.length === 1 ? "terminal aberto" : "terminais abertos"}</span>`
+      : '<span class="terms none">nenhum terminal</span>';
+    const warn = M.busyWarn === w.branch
+      ? `<p class="wtwarn" role="alert"><span>Feche os terminais abertos nesta worktree antes de remover: ${terms.map((s) => s.name).join(", ")}.</span><button type="button" class="linkish" data-act="goto" data-branch="${w.branch}">Abrir a revisão</button></p>`
+      : "";
+    return `<li class="wtrow">
+      <span class="wb"><code>${w.branch}</code><small title="${wtPath(w.branch)}">${wtRel(w.branch)}</small></span>
+      <span class="wc">criada ${w.created}</span>
+      ${state}
+      ${termsCell}
+      <button type="button" class="secondary sm" data-act="remove" data-branch="${w.branch}" data-key="rm-${w.branch}" aria-label="Remover a worktree de ${w.branch}">Remover</button>
+      ${warn}
+    </li>`;
+  }
+
+  function renderProject() {
+    $("#variant-note").hidden = !M.projectFooter;
+    $("#rows-current").innerHTML = rowHTML(CHECKED_OUT);
+    $("#rows-active").innerHTML = ["feature/ABC-200", "feature/ABC-198", "feature/ABC-195", "feature/ABC-171"].map(rowHTML).join("");
+    const wts = $("#wts");
+    if (!M.worktrees.length && !M.removedMsg) { wts.innerHTML = ""; return; }
+    wts.innerHTML = `
+      <h2 class="sect" id="wts-t">Worktrees do DiffLens <small>em <code>.difflens/worktrees</code>, fora do controle de versão pelo <code>.git/info/exclude</code></small></h2>
+      <ul class="list">${M.worktrees.length ? M.worktrees.map(wtRowHTML).join("") : '<li class="wtnote">Nenhuma worktree criada pelo DiffLens.</li>'}</ul>
+      ${M.removedMsg ? `<p class="hint wtstatus" role="status">${M.removedMsg}</p>` : ""}`;
+  }
+
+  // ---------- dialogs ----------
+  function renderModal() {
+    const host = $("#modal");
+    if (!M.modal) { host.innerHTML = ""; return; }
+    let title, text, ok;
+    if (M.modal.type === "close") {
+      const s = find(M, M.modal.id);
+      const cc = s.kind === "claude";
+      title = cc ? "Fechar o Claude Code?" : "Fechar este terminal?";
+      text = cc
+        ? "<code>claude</code> ainda está rodando e será encerrado. Se ele estiver no meio de uma tarefa, ela para onde estiver."
+        : `<code>${s.running}</code> ainda está rodando e será interrompido.`;
+      ok = "Fechar mesmo assim";
+    } else {
+      const w = M.worktrees.find((x) => x.branch === M.modal.branch);
+      title = `Remover a worktree de ${w.branch}?`;
+      const files = w.files.map((f) => `<code>${f}</code>`).join(", ");
+      text = `<code>${wtRel(w.branch)}</code> tem ${w.dirty === 1 ? "1 arquivo com alterações sem commit, que serão perdidas" : `${w.dirty} arquivos com alterações sem commit, que serão perdidas`}${files ? ": " + files : ""}.</p><p>A branch <code>${w.branch}</code> e os commits dela não são alterados.`;
+      ok = "Remover e perder as alterações";
+    }
+    host.innerHTML = `<div class="scrim" data-act="scrim">
+      <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dlg-t" aria-describedby="dlg-d">
+        <h2 id="dlg-t">${title}</h2>
+        <div id="dlg-d"><p>${text}</p></div>
+        <div class="acts">
+          <button type="button" class="secondary" data-act="dlg-cancel" data-key="dlg-cancel">Cancelar</button>
+          <button type="button" class="danger" data-act="dlg-ok" data-key="dlg-ok">${ok}</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // A mockup-only annotation, next to the close confirmation: idle shells do not ask.
+  function renderMockNote() {
+    const host = $("#mocknote");
+    if (!(M.modal && M.modal.type === "close")) { host.innerHTML = ""; return; }
+    const anchor = $("#term").hidden ? $("#foot") : $("#term");
+    const top = anchor.getBoundingClientRect().top - $("#app").getBoundingClientRect().top;
+    host.innerHTML = `<div class="mocknote" style="right:24px; top:${Math.max(8, top - 74)}px"><b>Nota do mockup:</b> o × de uma sessão ociosa, como “zsh 2”, fecha na hora, sem esta pergunta. Só pergunta quando há um processo em primeiro plano.</div>`;
+  }
+
+  function render() {
+    const key = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.key : null;
+    const review = M.screen === "review";
+    if (M.panel === "open" && !sessionsHere().length) M.panel = "collapsed";
+    $("#rscreen").hidden = !review;
+    $("#pscreen").hidden = review;
+    renderBar();
+    if (review) renderViews(); else renderProject();
+    renderFoot();
+    renderTerm();
+    renderModal();
+    renderMockNote();
+    if (M.modal) {
+      if (!$("#modal").contains(document.activeElement)) $('#modal [data-key="dlg-cancel"]').focus();
+    } else if (key) {
+      focusKey(key);
+    }
+  }
+
+  function focusKey(k) { const el = document.querySelector(`[data-key="${CSS.escape(k)}"]`); if (el) el.focus({ preventScroll: true }); }
+
+  // ---------- states of the switcher ----------
+  function setState(name) {
+    M = STATES[name](baseModel());
+    $$("[data-set-state]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.setState === name)));
+    render();
+    if (M.screen === "project") {
+      if (M.scrollTo) $("#" + M.scrollTo).scrollIntoView({ block: "start" });
+      else $("#pscreen").scrollTop = 0;
+    }
+  }
+  const unpress = () => $$("[data-set-state]").forEach((b) => b.setAttribute("aria-pressed", "false"));
+
+  function openReview(branch, view = "Diff") {
+    M.screen = "review"; M.branch = branch; M.view = view; M.rowMenu = null; M.modal = null; M.busyWarn = null; M.addMenu = false;
+  }
+
+  function openWith(branch, kind) {
+    openReview(branch);
+    if (M.where[branch]) { addSession(branch, kind); M.panel = "open"; }
+    else { M.panel = "create"; M.pending = kind; }
+    unpress();
+    render();
+    focusKey(M.panel === "create" ? "create" : "tbody");
+  }
+
+  function startCreate() {
+    M.panel = "creating"; M.auto = true;
+    render();
+    const branch = M.branch;
+    setTimeout(() => {
+      if (M.branch !== branch || M.panel !== "creating") return;
+      M.where[branch] = "wt";
+      if (!M.worktrees.some((w) => w.branch === branch)) M.worktrees.unshift({ branch, created: "agora", dirty: 0, files: [] });
+      addSession(branch, M.pending);
+      M.panel = "open"; M.auto = false;
+      render();
+      focusKey("tbody");
+    }, 2300);
+  }
+
+  function togglePanel() {
+    if (M.panel === "collapsed") {
+      if (!M.where[here()] && !sessionsHere().length) M.panel = "create";
+      else {
+        M.panel = "open";
+        if (!sessionsHere().length) addSession(here(), "shell");
+        const s = sessionsHere().find((x) => x.id === M.active[here()]);
+        if (s) s.activity = false;
+      }
+    } else {
+      M.panel = "collapsed"; M.addMenu = false;
+    }
+    render();
+  }
+
+  function removeWorktree(branch) {
+    M.worktrees = M.worktrees.filter((w) => w.branch !== branch);
+    M.where[branch] = null;
+    M.busyWarn = null;
+  }
+
+  // ---------- events ----------
+  document.addEventListener("click", (event) => {
+    const stateButton = event.target.closest("[data-set-state]");
+    if (stateButton) return setState(stateButton.dataset.setState);
+
+    const viewTab = event.target.closest(".tabs [data-view]");
+    if (viewTab) { M.view = viewTab.dataset.view; return render(); }
+
+    const el = event.target.closest("[data-act]");
+    const act = el && el.dataset.act;
+
+    // Clicking anywhere else closes the open menus.
+    if (act !== "addmenu" && M.addMenu && !event.target.closest("#addmenu")) { M.addMenu = false; if (!act) return render(); }
+    if (act !== "rowmenu" && M.rowMenu && !event.target.closest(".rmenu")) { M.rowMenu = null; if (!act) return render(); }
+    if (!act) return;
+
+    switch (act) {
+      case "toggle": return togglePanel();
+      case "tab": { // a tab shows its session and expands the panel on it
+        const s = find(M, el.dataset.id);
+        M.active[here()] = s.id; s.activity = false; M.panel = "open";
+        return render();
+      }
+      case "close": {
+        const s = find(M, el.dataset.id);
+        if (s.running) { M.modal = { type: "close", id: s.id }; M.returnKey = "close-" + s.id; return render(); }
+        closeSession(s.id); // an idle shell closes without asking
+        render();
+        return focusKey(M.active[here()] ? "tab-" + M.active[here()] : "add");
+      }
+      case "addmenu": M.addMenu = !M.addMenu; render(); if (M.addMenu) focusKey("new-shell"); return;
+      case "new": {
+        M.addMenu = false;
+        const key = here();
+        if (!M.where[key]) { M.panel = "create"; M.pending = el.dataset.kind; render(); return focusKey("create"); }
+        const id = addSession(key, el.dataset.kind);
+        M.panel = "open";
+        render();
+        return focusKey("tab-" + id);
+      }
+      case "create": return startCreate();
+      case "cancel-create": M.panel = "collapsed"; render(); return focusKey("add");
+      case "goto": openReview(el.dataset.branch); M.panel = "open"; unpress(); render(); return focusKey("tbody");
+      case "dlg-cancel": case "scrim": {
+        if (act === "scrim" && event.target !== el) return;
+        M.modal = null; render();
+        return M.returnKey && focusKey(M.returnKey);
+      }
+      case "dlg-ok": {
+        if (M.modal.type === "close") {
+          closeSession(M.modal.id);
+          M.modal = null; render();
+          return focusKey(M.active[here()] ? "tab-" + M.active[here()] : "add");
+        }
+        const branch = M.modal.branch;
+        removeWorktree(branch);
+        M.removedMsg = `Worktree de ${branch} removida, com as alterações sem commit dela. A branch continua na lista.`;
+        M.modal = null; render();
+        return;
+      }
+      case "rowmenu": {
+        const b = el.dataset.branch;
+        M.rowMenu = M.rowMenu === b ? null : b;
+        render();
+        if (M.rowMenu) { const first = $(`#rmenu-${CSS.escape(b)} [role=menuitem]`); if (first) first.focus(); }
+        return;
+      }
+      case "open-with": return openWith(el.dataset.branch, el.dataset.kind);
+      case "open-view": openReview(el.dataset.branch, el.dataset.view); M.panel = sessionsHere().length ? "open" : "collapsed"; unpress(); return render();
+      case "noop": M.rowMenu = null; return render();
+      case "remove": {
+        const branch = el.dataset.branch;
+        const w = M.worktrees.find((x) => x.branch === branch);
+        const terms = M.sessions[branch] || [];
+        if (terms.length) { M.busyWarn = branch; return render(); }
+        if (w.dirty) { M.modal = { type: "remove", branch }; M.returnKey = "rm-" + branch; return render(); }
+        removeWorktree(branch); // a clean worktree goes without asking
+        M.removedMsg = `Worktree de ${branch} removida. A branch continua na lista.`;
+        return render();
+      }
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    // ⌃` expands and collapses the panel; ⌃⇧` opens a new terminal.
+    if (event.ctrlKey && event.code === "Backquote" && footerShown() && !M.modal) {
+      event.preventDefault();
+      if (event.shiftKey && M.where[here()]) {
+        const id = addSession(here(), "shell"); M.panel = "open"; render(); return focusKey("tab-" + id);
+      }
+      return togglePanel();
+    }
+    if (event.key === "Escape") {
+      if (M.modal) { M.modal = null; render(); return M.returnKey && focusKey(M.returnKey); }
+      if (M.addMenu) { M.addMenu = false; render(); return focusKey("add"); }
+      if (M.rowMenu) { const b = M.rowMenu; M.rowMenu = null; render(); return focusKey("kebab-" + b); }
+      if (!$("#notes").hidden) { $("#notes").hidden = true; $("#notes-open").setAttribute("aria-expanded", "false"); $("#notes-open").focus(); }
+      return;
+    }
+    // Keeps Tab inside an open dialog.
+    if (event.key === "Tab" && M.modal) {
+      const btns = $$("#modal button");
+      const i = btns.indexOf(document.activeElement);
+      event.preventDefault();
+      btns[(i + (event.shiftKey ? -1 : 1) + btns.length) % btns.length].focus();
+      return;
+    }
+    // Arrows move between the footer's tabs, and resize the panel from its edge.
+    const tab = event.target.closest && event.target.closest('.ftabs button[role="tab"]');
+    if (tab && (event.key === "ArrowRight" || event.key === "ArrowLeft")) {
+      const tabs = $$('.ftabs button[role="tab"]');
+      const next = tabs[(tabs.indexOf(tab) + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
+      next.click();
+      return focusKey(next.dataset.key);
+    }
+    if (event.target.classList && event.target.classList.contains("grip") && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      event.preventDefault();
+      setHeight(M.height + (event.key === "ArrowUp" ? 24 : -24));
+    }
+    // Arrows inside an open menu.
+    const item = event.target.closest && event.target.closest('.menu [role="menuitem"]');
+    if (item && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      const items = $$('[role="menuitem"]', item.closest(".menu"));
+      items[(items.indexOf(item) + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+    }
+  });
+
+  // Dragging the panel's top edge.
+  function setHeight(h) {
+    M.height = Math.round(Math.min(maxHeight(), Math.max(140, h)));
+    $("#term").style.height = M.height + "px";
+    const grip = $("#term .grip");
+    if (grip) grip.setAttribute("aria-valuenow", String(M.height));
+  }
+  let drag = null;
+  document.addEventListener("pointerdown", (event) => {
+    const grip = event.target.closest(".grip");
+    if (!grip) return;
+    event.preventDefault();
+    grip.setPointerCapture(event.pointerId);
+    grip.classList.add("drag");
+    drag = { y: event.clientY, h: M.height, grip };
+  });
+  document.addEventListener("pointermove", (event) => { if (drag) setHeight(drag.h + (drag.y - event.clientY)); });
+  document.addEventListener("pointerup", () => { if (drag) { drag.grip.classList.remove("drag"); drag = null; } });
+  window.addEventListener("resize", () => { if (!$("#term").hidden) setHeight(M.height); renderMockNote(); });
+
+  $("#theme").addEventListener("click", (event) => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme === "dark";
+    root.dataset.theme = dark ? "light" : "dark";
+    event.currentTarget.textContent = dark ? "Tema escuro" : "Tema claro";
+  });
+  $("#notes-open").addEventListener("click", () => { $("#notes").hidden = false; $("#notes-open").setAttribute("aria-expanded", "true"); $("#notes-close").focus(); });
+  $("#notes-close").addEventListener("click", () => { $("#notes").hidden = true; $("#notes-open").setAttribute("aria-expanded", "false"); $("#notes-open").focus(); });
+
+  setState("shell");
+</script>
+</body>
+</html>

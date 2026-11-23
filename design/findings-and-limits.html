@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiffLens, achados do modelo e limites fora das próprias abas (mockup)</title>
+<style>
+  /* Tokens of design/prototype.html, unchanged, plus the three severity hues and the limit ink of this mockup. */
+  :root[data-theme="dark"] {
+    --bg:#151925; --panel:#1a1f2e; --raised:#232a3d; --line:#2c344c; --text:#e7e9f2; --muted:#8d96ae; --faint:#5c6580;
+    --accent:#7ea6ff; --accent-soft:rgba(126,166,255,.14);
+    --add:#56cf97; --del:#f27d72; --mod:#e9b85c; --ai:#d992e0;
+    --add-bg:rgba(86,207,151,.11); --del-bg:rgba(242,125,114,.11); --mod-bg:rgba(233,184,92,.10); --ai-bg:rgba(217,146,224,.09);
+    /* New: severity of a model finding. Rose, tangerine and teal: none is the green, amber or red of a function's
+       state bar, nor the blue of selection and added links. */
+    --sev-high:#ff6b98; --sev-med:#ff9e57; --sev-low:#5fc9cf;
+    /* New: the limit gauge is ink, not a hue, so it never reads as a state. */
+    --limit:#e7e9f2;
+    color-scheme:dark;
+  }
+  :root[data-theme="light"] {
+    --bg:#eceff5; --panel:#f7f8fb; --raised:#ffffff; --line:#d8ddea; --text:#1b2132; --muted:#5d6780; --faint:#98a1b7;
+    --accent:#2f5fd8; --accent-soft:rgba(47,95,216,.10);
+    --add:#12855a; --del:#c8402f; --mod:#a06c08; --ai:#9b3fa8;
+    --add-bg:rgba(18,133,90,.10); --del-bg:rgba(200,64,47,.09); --mod-bg:rgba(160,108,8,.09); --ai-bg:rgba(155,63,168,.07);
+    --sev-high:#c4215a; --sev-med:#b4520a; --sev-low:#0e7c83;
+    --limit:#1b2132;
+    color-scheme:light;
+  }
+  * { box-sizing:border-box; margin:0; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  body { font:13px/1.45 "IBM Plex Sans", system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  code, .mono, pre { font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:12px; }
+  button, input, textarea { font:inherit; color:inherit; }
+  button { background:none; border:0; cursor:pointer; padding:0; text-align:left; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+  [hidden] { display:none !important; }
+
+  /* ---------- mockup controls and notes: not part of the app ---------- */
+  .mock { position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:8px 16px; background:repeating-linear-gradient(135deg, var(--bg) 0 10px, var(--panel) 10px 20px); border-bottom:2px dashed var(--faint); font-size:12px; }
+  .mock strong { font-weight:600; color:var(--muted); }
+  .mock .seg { display:inline-flex; padding:2px; border-radius:7px; background:var(--panel); border:1px solid var(--line); }
+  .mock .seg button { padding:3px 10px; border-radius:5px; color:var(--muted); }
+  .mock .seg button[aria-pressed="true"] { background:var(--raised); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  .mock .note { color:var(--faint); margin-left:auto; }
+  .mock a { color:var(--accent); }
+  .mnotes { padding:22px max(28px, calc(50% - 600px)) 40px; background:repeating-linear-gradient(135deg, var(--bg) 0 10px, var(--panel) 10px 20px); border-top:2px dashed var(--faint); }
+  .mnotes h2 { font-size:13px; font-weight:600; color:var(--muted); margin-bottom:10px; }
+  .mnotes ol, .mnotes ul { display:grid; gap:7px; padding-left:20px; max-width:110ch; }
+  .mnotes li b { font-weight:600; }
+  .mnotes .col2 { display:grid; grid-template-columns:1fr 1fr; gap:28px; }
+  .mnotes section + section { margin-top:20px; }
+
+  /* ---------- app chrome, static ---------- */
+  .app { min-height:calc(100vh - 44px); display:flex; flex-direction:column; }
+  .bar { display:flex; align-items:center; gap:14px; height:46px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .logo { display:flex; align-items:center; gap:8px; font-weight:600; letter-spacing:-.01em; }
+  .crumb { display:flex; align-items:center; gap:8px; color:var(--muted); }
+  .crumb .c { padding:4px 8px; border-radius:6px; color:var(--text); font-weight:500; }
+  .compare { display:flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--raised); }
+  .compare .into { color:var(--faint); }
+  .stat { color:var(--muted); } .stat .a { color:var(--add); } .stat .d { color:var(--del); }
+  .spacer { flex:1; }
+  .ext { display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border:1px solid var(--line); border-radius:6px; color:var(--text); text-decoration:none; font-size:12px; white-space:nowrap; }
+  .analysis { display:flex; align-items:center; gap:8px; padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .analysis i { width:8px; height:8px; border-radius:50%; background:var(--add); }
+  .ghost { padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); }
+  .tabs { display:flex; gap:4px; padding:0 12px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .tab { padding:10px 12px 9px; color:var(--muted); border-bottom:2px solid transparent; font-weight:500; }
+  button.tab:hover { color:var(--text); }
+  .tab[aria-selected="true"] { color:var(--text); border-color:var(--accent); }
+  .count { margin-left:6px; padding:0 6px; border-radius:9px; font-size:11px; background:var(--del-bg); color:var(--del); }
+  .count.ai { background:var(--ai-bg); color:var(--ai); }
+
+  /* buttons, as in the app */
+  .primary { padding:7px 14px; border-radius:7px; background:var(--accent); color:var(--bg); font-weight:500; white-space:nowrap; }
+  .primary:hover { filter:brightness(1.08); }
+  .secondary { padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:var(--raised); white-space:nowrap; }
+  .secondary:hover { border-color:var(--faint); }
+  .sm { padding:4px 10px; font-size:12px; border-radius:6px; }
+  .linkish { color:var(--accent); font-size:12px; } .linkish:hover { text-decoration:underline; }
+  .mini { border:1px solid var(--line); border-radius:4px; padding:0 6px; font-size:11px; line-height:16px; color:var(--muted); white-space:nowrap; }
+  .mini:hover { color:var(--text); }
+  .seg { display:inline-flex; padding:2px; border-radius:7px; background:var(--panel); border:1px solid var(--line); }
+  .seg > * { padding:3px 10px; border-radius:5px; color:var(--muted); font-size:13px; }
+  .seg > .on { background:var(--raised); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  em.t-ai, em.t-m { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; white-space:nowrap; }
+  em.t-ai { background:var(--ai-bg); color:var(--ai); }
+  em.t-m { background:var(--accent-soft); color:var(--accent); }
+  .faint { color:var(--faint); } .muted { color:var(--muted); }
+  .a { color:var(--add); } .d { color:var(--del); }
+
+  /* ============ THE SHARED VISUAL LANGUAGE ============ */
+  /* Severity mark: three rising bars, as many filled as the severity (3 alta, 2 média, 1 baixa), in its hue.
+     The fill count carries the meaning on its own, so it survives colour blindness and the greyscale of a dimmed box. */
+  svg.bars { width:11px; height:10px; flex:none; fill:currentColor; }
+  svg.gauge { width:13px; height:10px; flex:none; color:var(--limit); }
+  /* Tool check (go vet, staticcheck): a wrench. Function no test executes: a flask struck through. Both in ink, like the
+     gauge: measured, never a hue, never the AI colour. */
+  svg.wrench, svg.notest { width:11px; height:11px; flex:none; color:var(--limit); }
+  .s-high { color:var(--sev-high); } .s-med { color:var(--sev-med); } .s-low { color:var(--sev-low); }
+  /* In text: a chip with the mark and the word. */
+  em.sev { display:inline-flex; align-items:center; gap:5px; font-style:normal; font-size:11px; line-height:17px; padding:0 7px 0 6px; border-radius:9px; background:color-mix(in srgb, currentColor 13%, transparent); white-space:nowrap; }
+  em.lim, em.tool { display:inline-flex; align-items:center; gap:5px; font-style:normal; font-size:11px; line-height:15px; padding:0 7px 0 6px; border-radius:9px; border:1px solid var(--line); background:var(--raised); color:var(--text); white-space:nowrap; }
+  /* The tool chip: wrench, tool name, and the rule in the tool's own spelling. */
+  em.tool code { font-size:10.5px; color:var(--muted); }
+  /* Over a limit, as the Quality tab writes it: the value in its "acima do limite" red. Only ever text, never a box. */
+  .over { color:var(--del); font-weight:600; }
+  /* On a box: one badge on the bottom-right corner, across the border. The top-right corner is the review tick's. */
+  .sigb { position:absolute; right:-9px; bottom:-9px; z-index:2; display:inline-flex; align-items:center; gap:5px; height:18px; padding:0 6px; border-radius:9px; background:var(--bg); border:1px solid color-mix(in srgb, var(--text) 26%, transparent); font:500 10.5px/1 "IBM Plex Mono", monospace; color:var(--text); box-shadow:0 1px 2px rgba(0,0,0,.25); pointer-events:none; }
+  .sigb > span { display:inline-flex; align-items:center; gap:3px; }
+  .sigb > i { width:1px; height:10px; background:var(--line); }
+
+  /* ---------- page: same width and padding as ReviewPage ---------- */
+  .page { flex:1; padding:36px max(28px, calc(50% - 540px)) 64px; }
+  h2.sect { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; color:var(--muted); margin:30px 0 10px; }
+  h2.sect .n { color:var(--faint); font-weight:400; }
+  h2.sect.first { margin-top:0; }
+  .hint { color:var(--faint); font-size:12px; margin-top:8px; }
+
+  /* ===================== OVERVIEW ===================== */
+  .ov { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:0 56px; }
+  .lead h1 { font-size:20px; font-weight:600; letter-spacing:-.015em; line-height:1.3; }
+  .lead .by { display:flex; align-items:center; gap:8px; margin:6px 0 10px; color:var(--faint); font-size:12px; }
+  .lead p { max-width:68ch; color:var(--text); }
+  .look { list-style:none; padding:0; border-top:1px solid var(--line); }
+  .look > li { border-bottom:1px solid var(--line); }
+  .lrow { display:grid; grid-template-columns:28px 1fr auto; gap:10px; align-items:start; width:100%; padding:13px 8px; border-radius:6px; }
+  .lrow:hover { background:var(--panel); }
+  .lrow .rk { padding-top:1px; font:500 13px "IBM Plex Mono", monospace; color:var(--faint); }
+  .lrow .bd { display:grid; gap:3px; min-width:0; }
+  .lrow strong { font-size:14px; font-weight:500; }
+  .lrow .dt { color:var(--muted); }
+  .lrow .tg { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:3px; }
+  .lrow .tg code { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .lrow .go { visibility:hidden; padding-top:2px; font-size:12px; color:var(--accent); white-space:nowrap; }
+  .lrow:hover .go, .lrow:focus-visible .go { visibility:visible; }
+  /* "O modelo sugere mudar": one line per finding, shorter than the rows above. */
+  .sugg { list-style:none; padding:0; border-top:1px solid var(--line); }
+  .sugg > li { border-bottom:1px solid var(--line); }
+  .srow { display:grid; grid-template-columns:70px minmax(0,1fr) auto; gap:12px; align-items:baseline; width:100%; padding:8px; border-radius:6px; }
+  .srow:hover { background:var(--panel); }
+  .srow .tt { min-width:0; display:flex; align-items:baseline; gap:10px; }
+  .srow .tt span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .srow .tt code { flex:none; color:var(--muted); font-size:12px; }
+  .srow .go { visibility:hidden; font-size:12px; color:var(--accent); white-space:nowrap; }
+  .srow:hover .go, .srow:focus-visible .go { visibility:visible; }
+  .suggfoot { display:flex; align-items:center; gap:12px; margin-top:8px; font-size:12px; color:var(--faint); }
+  .kv { display:grid; grid-template-columns:1fr auto; gap:9px 16px; border-top:1px solid var(--line); padding-top:12px; }
+  .kv dt { color:var(--muted); }
+  .kv dd { text-align:right; }
+  .kv dd small { display:block; color:var(--faint); font-size:12px; }
+  .kv dd b { font-weight:500; font-family:"IBM Plex Mono", monospace; font-size:12px; }
+
+  /* ===================== FLOW ===================== */
+  .flow { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .ftools { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--bg); }
+  .opt { padding:3px 10px; border-radius:12px; border:1px solid var(--line); color:var(--muted); font-size:12px; }
+  .opt.on { border-color:var(--accent); background:var(--accent-soft); color:var(--text); }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 14px; list-style:none; padding:0; color:var(--muted); font-size:12px; }
+  .legend li { display:inline-flex; align-items:center; gap:6px; }
+  .legend .full { flex-basis:100%; }
+  .legend.links { flex-basis:100%; }
+  .legend .lbl { color:var(--faint); }
+  .dot { width:8px; height:8px; border-radius:2px; flex:none; }
+  .dot.new { background:var(--add); } .dot.mod { background:var(--mod); } .dot.del { background:var(--del); } .dot.same { background:var(--faint); }
+  .ring { width:11px; height:11px; border-radius:50%; border:1.6px dashed var(--accent); }
+  .sig-legend { padding-left:14px; border-left:1px solid var(--line); }
+  .canvas { position:relative; flex:1; min-height:640px; overflow:auto; background-image:radial-gradient(var(--line) 1px, transparent 1px); background-size:22px 22px; }
+  .world { position:relative; width:1230px; height:640px; }
+  .world svg.edges { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .edge { fill:none; stroke:var(--faint); stroke-width:1.4; }
+  .edge.added { stroke:var(--accent); stroke-width:1.8; }
+  .edge.removed { stroke:var(--del); stroke-width:1.4; stroke-dasharray:4 3; }
+  .xmark { fill:var(--del); font:700 13px "IBM Plex Sans", sans-serif; }
+  .ctr { position:absolute; border:1px dashed var(--faint); border-radius:12px; background:color-mix(in srgb, var(--raised) 35%, transparent); }
+  .ctr header { display:flex; align-items:center; gap:6px; height:34px; padding:0 10px; font-size:12px; }
+  .ctr header code { font-weight:500; }
+  .fn { position:absolute; height:62px; }
+  .fn .box { position:relative; width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; padding:6px 10px 6px 12px; border:1px solid var(--line); border-radius:7px; background:var(--raised); line-height:15px; }
+  .fn .box:focus-visible { outline-offset:2px; border-radius:7px; }
+  .fn .sbar { position:absolute; left:0; top:10px; bottom:10px; width:3px; border-radius:1.5px; }
+  .sbar.new { background:var(--add); } .sbar.mod { background:var(--mod); } .sbar.del { background:var(--del); } .sbar.same { background:var(--faint); }
+  .fn .nm { font:500 11.5px "IBM Plex Mono", monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fn .dt { font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fn .lc { display:flex; gap:6px; font:11px "IBM Plex Mono", monospace; }
+  .fn.sel .box { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .fn.same .box { opacity:.6; }
+  .fn.gone .box { opacity:.55; }
+  .fn.gone .nm { text-decoration:line-through; text-decoration-color:var(--del); }
+  .fn.grp .box { border-radius:10px; border-width:1.5px; background:var(--panel); box-shadow:0 1px 0 var(--line); padding-right:30px; }
+  .fn.grp .nmrow { display:flex; align-items:center; gap:6px; min-width:0; }
+  .fn.grp .chevr { position:absolute; top:8px; right:8px; color:var(--muted); }
+  .tick { position:absolute; top:-7px; right:-7px; z-index:2; width:16px; height:16px; border-radius:50%; border:1.4px solid var(--add); background:var(--bg); color:var(--add); font:600 10px/13px "IBM Plex Sans", sans-serif; text-align:center; pointer-events:none; }
+
+  /* popover, as FlowPopover: 380px, header, scrolling body, footer */
+  .pop { position:absolute; z-index:5; width:380px; max-height:616px; display:flex; flex-direction:column; border:1px solid var(--faint); border-radius:12px; background:var(--panel); box-shadow:0 28px 70px rgba(0,0,0,.45); }
+  :root[data-theme="light"] .pop { box-shadow:0 28px 70px rgba(0,0,0,.18); }
+  .pop::before { content:""; position:absolute; top:calc(var(--caret) - 6px); left:-7px; width:12px; height:12px; border:1px solid var(--faint); border-top:0; border-right:0; background:var(--panel); transform:rotate(45deg); }
+  .pop > header { flex:none; padding:16px 18px 14px; border-bottom:1px solid var(--line); }
+  .pop h3 { display:flex; align-items:flex-start; gap:10px; font:500 15px "IBM Plex Mono", monospace; letter-spacing:-.01em; }
+  .pop h3 span { flex:1; min-width:0; overflow-wrap:anywhere; }
+  .pop .x { width:24px; height:24px; display:grid; place-items:center; border-radius:6px; color:var(--muted); flex:none; }
+  .pop .x:hover { background:var(--raised); color:var(--text); }
+  .pop .sub { display:flex; flex-wrap:wrap; align-items:center; gap:2px 8px; margin-top:6px; font-size:12px; color:var(--muted); }
+  .pop .sub code { margin-left:auto; color:var(--faint); overflow-wrap:anywhere; }
+  .pbody { min-height:0; overflow-y:auto; padding:14px 18px 16px; }
+  .facts { display:grid; grid-template-columns:1fr auto; gap:7px 12px; margin-top:12px; }
+  .facts dt { color:var(--muted); }
+  .facts dd { text-align:right; font:12px/1.6 "IBM Plex Mono", monospace; }
+  .psec { margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+  .psec h4 { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12px; font-weight:400; color:var(--faint); }
+  .psec h4 .r { margin-left:auto; }
+  .psec h4, .psec h4 .r { white-space:nowrap; }
+  .lims { display:grid; grid-template-columns:14px minmax(0,1fr) auto; gap:6px 8px; align-items:baseline; }
+  .lims dt { display:contents; }
+  .lims dt span { color:var(--muted); }
+  .lims dt small { display:block; color:var(--faint); font-size:11px; }
+  .lims dd { text-align:right; font:12px "IBM Plex Mono", monospace; white-space:nowrap; }
+  .lims dd .of { color:var(--faint); font-family:"IBM Plex Sans", sans-serif; }
+  .lims .g { align-self:center; }
+  .pfind { list-style:none; padding:0; display:grid; gap:8px; }
+  .pfind li { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:2px 8px; align-items:baseline; font-size:12px; }
+  .pfind .t { text-decoration:underline; text-decoration-color:var(--faint); text-underline-offset:2px; font-size:12.5px; }
+  .pfind .t:hover { text-decoration-color:var(--text); }
+  .pfind small { grid-column:2; color:var(--faint); font-size:11px; }
+  .caveat { margin-top:8px; font-size:11px; color:var(--faint); }
+  .calls { list-style:none; padding:0; display:grid; gap:4px; font-size:12px; }
+  .calls li { display:flex; align-items:baseline; gap:8px; min-width:0; }
+  .calls li > :first-child { font-family:"IBM Plex Mono", monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .calls button { text-decoration:underline; text-decoration-color:var(--faint); text-underline-offset:2px; }
+  .calls .r { margin-left:auto; display:flex; gap:6px; flex:none; }
+  .calls .gone { text-decoration:line-through; }
+  .pop > footer { flex:none; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 18px; border-top:1px solid var(--line); font-size:12px; color:var(--faint); }
+  .pop > footer > span:first-child { min-width:0; flex-shrink:10; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pop > footer .acts { display:flex; gap:8px; min-width:0; }
+  .pop > footer .acts .secondary { flex:none; }
+  .pop > footer .acts .primary { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+
+  /* ===================== DIFF ===================== */
+  .diffv { flex:1; display:flex; flex-direction:column; min-height:0; }
+  .dtools { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; padding:10px 16px; border-bottom:1px solid var(--line); }
+  .dtools .right { margin-left:auto; display:flex; gap:14px; color:var(--faint); font-size:12px; }
+  kbd { font:11px "IBM Plex Mono", monospace; padding:0 4px; border:1px solid var(--line); border-radius:4px; color:var(--muted); }
+  .ftog { display:inline-flex; align-items:center; gap:7px; padding:3px 10px 3px 8px; border-radius:7px; border:1px solid var(--line); background:var(--panel); font-size:12.5px; cursor:pointer; }
+  .ftog:has(input:checked) { border-color:color-mix(in srgb, var(--ai) 45%, transparent); background:var(--ai-bg); }
+  .ftog:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:2px; }
+  .ftog input { margin:0; accent-color:var(--ai); outline:none; }
+  /* The checks toggle is ink, not AI: what it hides was measured by a tool. */
+  .ftog.ckt:has(input:checked) { border-color:color-mix(in srgb, var(--text) 32%, transparent); background:var(--raised); }
+  .ftog.ckt input { accent-color:var(--text); }
+  .dwrap { flex:1; display:grid; grid-template-columns:250px minmax(0,1fr); min-height:0; }
+  .flist { border-right:1px solid var(--line); padding:10px 8px; background:var(--bg); }
+  .flist h3 { font-size:12px; font-weight:500; color:var(--faint); padding:4px 8px 6px; }
+  .flist ul { list-style:none; padding:0; display:grid; gap:1px; }
+  .flist li { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:6px; font-size:12.5px; }
+  .flist li.on { background:var(--accent-soft); }
+  .flist li span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .flist li small { font:11px "IBM Plex Mono", monospace; color:var(--faint); }
+  .dmain { min-width:0; overflow:auto; padding-bottom:40px; }
+  .fhead { position:sticky; top:0; z-index:3; display:flex; align-items:center; gap:12px; padding:8px 16px; background:var(--bg); border-bottom:1px solid var(--line); }
+  .fhead code { font-size:12.5px; font-weight:500; }
+  .fhead .sigs { display:flex; gap:8px; margin-left:6px; }
+  .fhead .secondary { margin-left:auto; }
+  .dfile + .dfile { margin-top:18px; }
+  .dfile { scroll-margin-top:64px; }
+  .ln { display:grid; grid-template-columns:44px 44px 16px minmax(0,1fr); font:12px/1.65 "IBM Plex Mono", monospace; tab-size:4; cursor:pointer; }
+  .ln:hover { filter:brightness(1.15); }
+  .ln > i { font-style:normal; color:var(--faint); text-align:right; padding-right:10px; user-select:none; }
+  .ln .lane { position:relative; display:grid; place-items:center; }
+  .ln .c { display:flex; align-items:center; min-width:0; }
+  .ln .c > span { white-space:pre; }
+  .ln.add { background:var(--add-bg); } .ln.add .c > span:first-child::before { content:"+ "; color:var(--add); }
+  .ln.del { background:var(--del-bg); } .ln.del .c > span:first-child::before { content:"− "; color:var(--del); }
+  .ln.ctx .c > span:first-child::before { content:"  "; }
+  .ln .cm { color:var(--faint); }
+  /* Lines a model finding cites: a thin bar of the AI colour in the signal lane. */
+  .ln.rng .lane::after { content:""; position:absolute; left:6px; top:0; bottom:0; width:2px; background:var(--ai); }
+  .ln.rng.rs .lane::after { top:4px; border-radius:1px 1px 0 0; }
+  .ln.rng.re .lane::after { bottom:4px; border-radius:0 0 1px 1px; }
+  .fold { padding:3px 16px 3px 120px; color:var(--faint); font-size:12px; background:var(--panel); border-block:1px solid var(--line); }
+  /* The limit marker on the line a function over a limit starts at. */
+  .limpill, .ntnote { margin:0 12px 0 24px; display:inline-flex; align-items:center; gap:6px; padding:0 8px; border:1px solid var(--line); border-radius:9px; background:var(--panel); color:var(--muted); font:11px/18px "IBM Plex Sans", sans-serif; white-space:nowrap; }
+  .limpill b { color:var(--text); font:600 11px "IBM Plex Mono", monospace; }
+  .limpill:hover { border-color:var(--faint); }
+  /* "No test executes this function": a note, not a button; dashed, since it states an absence. */
+  .ntnote { border-style:dashed; cursor:default; }
+  .limpill + .ntnote { margin-left:-6px; }
+  /* A tool check under its line: one row, ink edge, no AI tint, no Modelo tag. */
+  .ck { margin:6px 16px 8px 120px; max-width:720px; display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:6px 10px 6px 12px; border:1px solid var(--line); border-left:2px solid var(--limit); border-radius:8px; background:var(--panel); font:13px/1.45 "IBM Plex Sans", sans-serif; cursor:default; }
+  .ck .msg { font:12px "IBM Plex Mono", monospace; overflow-wrap:anywhere; }
+  .ck .loc { color:var(--faint); font-size:12px; }
+  .ck .secondary { margin-left:auto; }
+  .ck .made { color:var(--muted); }
+  body.no-checks .ck, body.no-checks .ckm { display:none; }
+  .limpanel { margin:6px 16px 8px 120px; max-width:560px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); font:13px/1.45 "IBM Plex Sans", sans-serif; cursor:default; }
+  .limpanel header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .limpanel header strong { font-weight:500; }
+  .limpanel footer { margin-top:8px; }
+  /* A model finding under its line: the comment card's size, the explanation's AI tint, and the Modelo tag. */
+  .mf { margin:6px 16px 8px 120px; max-width:720px; padding:10px 12px; border:1px solid color-mix(in srgb, var(--ai) 28%, transparent); border-left:2px solid var(--ai); border-radius:8px; background:var(--ai-bg); font:13px/1.45 "IBM Plex Sans", sans-serif; cursor:default; }
+  .mf-h { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+  .mf-h strong { font-weight:500; }
+  .mf-h .loc { color:var(--faint); font-size:12px; }
+  .mf-h .tog { margin-left:auto; }
+  .mf-b { margin-top:6px; }
+  .mf-b > p { max-width:78ch; color:var(--text); }
+  .mf-b dl { display:grid; grid-template-columns:120px minmax(0,1fr); gap:6px 14px; margin-top:8px; }
+  .mf-b dt { color:var(--muted); }
+  .mf-b dd { max-width:70ch; }
+  .mf-acts { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-top:10px; }
+  .mf-acts .aibtn { padding:4px 10px; font-size:12px; border-radius:6px; border:1px solid color-mix(in srgb, var(--ai) 45%, transparent); background:var(--panel); color:var(--ai); font-weight:500; white-space:nowrap; }
+  .mf-acts .aibtn:hover { border-color:var(--ai); }
+  .mf-acts .aibtn.made { color:var(--text); border-color:var(--line); }
+  .mf[data-open="false"] .mf-b { display:none; }
+  .mf[data-open="false"] { padding-block:6px; }
+  .mf.dismissed { background:transparent; border-left-color:var(--line); }
+  .mf.dismissed strong { color:var(--muted); text-decoration:line-through; }
+  body.no-findings .mf, body.no-findings .ln.rng .lane::after { display:none; }
+  /* comment cards, as LineNotes */
+  .cmt { margin:6px 16px 8px 120px; max-width:640px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); font:13px/1.45 "IBM Plex Sans", sans-serif; cursor:default; }
+  .cmt .who { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-bottom:3px; color:var(--muted); font-size:12px; }
+  .cmt .who b { color:var(--text); font-weight:500; }
+  .cmt .tag { font-size:11px; padding:0 7px; border:1px solid var(--line); border-radius:9px; color:var(--muted); }
+  .cmt .from { font-size:11px; color:var(--faint); }
+  .cmt p { white-space:pre-wrap; overflow-wrap:anywhere; }
+  .cmt .acts { display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:7px; }
+  .cmt .acts button { color:var(--accent); font-size:12px; } .cmt .acts button:hover { text-decoration:underline; }
+  .cmt textarea { width:100%; min-height:112px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:var(--bg); resize:vertical; line-height:1.45; }
+  .cmt .note { margin-top:6px; color:var(--faint); font-size:12px; }
+  .cmt.flash { border-color:var(--flash, var(--ai)); box-shadow:0 0 0 2px color-mix(in srgb, var(--flash, var(--ai)) 35%, transparent); }
+
+  /* Variant without findings nor limits: every new mark goes, and nothing takes its place. */
+  body[data-variant="clean"] .sig, body[data-variant="clean"] .ln.rng .lane::after { display:none !important; }
+  body:not([data-variant="clean"]) .clean { display:none !important; }
+
+  @media (prefers-reduced-motion: no-preference) { .cmt { transition:box-shadow .2s, border-color .2s; } }
+  @media (max-width:1000px) {
+    .bar .stat, .bar .ext, .bar .analysis { display:none; }
+    .ov { grid-template-columns:1fr; } .dwrap { grid-template-columns:1fr; } .flist { display:none; }
+    .mnotes .col2 { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body data-section="overview" data-variant="signals">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- Severity marks: three rising bars, as many filled as the severity. -->
+  <symbol id="sev-3" viewBox="0 0 11 10"><rect x="0" y="6" width="3" height="4" rx=".6"/><rect x="4" y="3" width="3" height="7" rx=".6"/><rect x="8" y="0" width="3" height="10" rx=".6"/></symbol>
+  <symbol id="sev-2" viewBox="0 0 11 10"><rect x="0" y="6" width="3" height="4" rx=".6"/><rect x="4" y="3" width="3" height="7" rx=".6"/><rect x="8" y="0" width="3" height="10" rx=".6" opacity=".28"/></symbol>
+  <symbol id="sev-1" viewBox="0 0 11 10"><rect x="0" y="6" width="3" height="4" rx=".6"/><rect x="4" y="3" width="3" height="7" rx=".6" opacity=".28"/><rect x="8" y="0" width="3" height="10" rx=".6" opacity=".28"/></symbol>
+  <!-- Limit mark: a gauge with its needle in the high end. -->
+  <symbol id="gauge" viewBox="0 0 14 10"><path d="M1.5 9a5.5 5.5 0 0 1 11 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 9l3.3-3.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="9" r="1.2" fill="currentColor"/></symbol>
+  <!-- Tool check mark: an open-end wrench. -->
+  <symbol id="wrench" viewBox="0 0 12 12"><path d="M11 3.8A2.8 2.8 0 1 1 8.2 1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M6.3 5.7L2 10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <!-- No test executes the function: a lab flask, struck through. -->
+  <symbol id="notest" viewBox="0 0 12 12"><path d="M4.4 1.3h3.2 M5.2 1.3v3.4L2.3 10.4h7.4L6.8 4.7V1.3" fill="none" stroke="currentColor" stroke-width="1.15" stroke-linejoin="round" stroke-linecap="round"/><path d="M1.4 1.6l9.2 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+  <symbol id="pkg" viewBox="0 0 14 14"><path d="M7 1.5l5 2.6v5.8L7 12.5 2 9.9V4.1z M2 4.1l5 2.6 5-2.6 M7 6.7v5.8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+</svg>
+
+<!-- MOCKUP CONTROLS: outside the app frame -->
+<div class="mock" role="region" aria-label="Controles do mockup">
+  <strong>Controles do mockup, fora do app</strong>
+  <div class="seg" role="group" aria-label="Seção">
+    <button type="button" data-set-section="overview" aria-pressed="true">Visão geral</button>
+    <button type="button" data-set-section="flow" aria-pressed="false">Flow</button>
+    <button type="button" data-set-section="diff" aria-pressed="false">Diff</button>
+  </div>
+  <div class="seg" role="group" aria-label="Dados">
+    <button type="button" data-set-variant="signals" aria-pressed="true">Com achados e limites</button>
+    <button type="button" data-set-variant="clean" aria-pressed="false">Sem achados nem limites</button>
+  </div>
+  <button type="button" class="ghost" id="pop-toggle" data-sec="flow">Fechar o popover</button>
+  <button type="button" class="ghost" id="theme">Tema claro</button>
+  <span class="note">Interações falsas: abas, os popovers de <code>authenticate</code> e <code>isOldCryptCost</code>, links para o Diff, “Mostrar achados do modelo”, “Mostrar checagens”, recolher, “Criar rascunho de comentário”. <a href="#notes">Notas do mockup</a></span>
+</div>
+
+<div class="app">
+  <header class="bar">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="var(--accent)" stroke-width="1.8"/><path d="M5.5 8.5h6M8.5 5.5v6" stroke="var(--add)" stroke-width="1.6" stroke-linecap="round"/><path d="M13 13l5 5" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/></svg>
+      DiffLens
+    </div>
+    <nav class="crumb" aria-label="Onde você está">
+      <span class="c">Projetos</span><span>/</span><span class="c">identity-api</span>
+      <span class="compare mono"><span>feat/ad-login</span><span class="into">para</span><span>main</span></span>
+      <span class="stat mono">23 arquivos <span class="a">+1.204</span> <span class="d">−318</span></span>
+      <a class="ext" href="#" onclick="return false">PR #91<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 1.5h5v5M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="analysis"><i></i><span>Analisado <code>4c1d9e2</code>, há 20 min</span></div>
+    <span class="ghost">Preferências</span>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Visões da revisão">
+    <button type="button" class="tab" role="tab" data-set-section="overview" aria-selected="true">Visão geral</button>
+    <button type="button" class="tab" role="tab" data-set-section="flow" aria-selected="false">Flow</button>
+    <button type="button" class="tab" role="tab" data-set-section="diff" aria-selected="false">Diff</button>
+    <span class="tab" role="tab" aria-selected="false">Testes<span class="count">1 falhando</span></span>
+    <span class="tab" role="tab" aria-selected="false">Qualidade</span>
+    <span class="tab" role="tab" aria-selected="false">Insights<span class="count ai sig">8 achados</span></span>
+    <span class="tab" role="tab" aria-selected="false">Executar</span>
+  </nav>
+
+  <!-- ===================== OVERVIEW ===================== -->
+  <main class="page" data-sec="overview" aria-label="Visão geral">
+    <div class="ov">
+      <div>
+        <section class="lead" aria-labelledby="lead-t">
+          <h1 id="lead-t">Login com Active Directory, com fallback para a senha local</h1>
+          <p class="by"><em class="t-ai">Modelo</em><span>Claude Code nesta máquina, há 20 min</span></p>
+          <p>O login passa a validar a senha no Active Directory e, quando o AD não responde, cai para a senha guardada no banco. Também troca a verificação legada pelo bcrypt e marca hashes com custo antigo para serem regravados.</p>
+        </section>
+
+        <h2 class="sect">Onde olhar primeiro</h2>
+        <ol class="look" aria-label="Onde olhar primeiro">
+          <li class="sig"><button type="button" class="lrow" data-goto="flow">
+            <span class="rk">1</span>
+            <span class="bd">
+              <strong>Erro do AD não é registrado antes de cair no fallback</strong>
+              <span class="dt">Quando bindAD devolve erro, o código segue para a senha local sem registrar nada. Se o AD sair do ar, ninguém fica sabendo.</span>
+              <span class="tg"><em class="t-ai">Modelo</em><em class="sev s-high"><svg class="bars" aria-hidden="true"><use href="#sev-3"/></svg>Alta</em><code>app/services/auth_service/auth_service.go:85</code></span>
+            </span>
+            <span class="go">Abrir no Flow</span>
+          </button></li>
+          <li class="sig"><button type="button" class="lrow" data-goto="flow:pop-crypt">
+            <span class="rk">2</span>
+            <span class="bd">
+              <strong>isOldCryptCost lê o custo na posição errada do hash</strong>
+              <span class="dt">O custo de um hash bcrypt fica nos caracteres 4 e 5, mas a função lê os caracteres 3 e 4. Nenhum hash antigo é regravado.</span>
+              <span class="tg"><em class="t-ai">Modelo</em><em class="sev s-high"><svg class="bars" aria-hidden="true"><use href="#sev-3"/></svg>Alta</em><code>app/services/auth_service/crypt.go:47</code></span>
+            </span>
+            <span class="go">Abrir no Flow</span>
+          </button></li>
+          <li><button type="button" class="lrow">
+            <span class="rk"><span class="sig">3</span><span class="clean">1</span></span>
+            <span class="bd">
+              <strong>TestLogin/locks_after_five_failures falha</strong>
+              <span class="dt">Ele exercita LockoutTracker.register.</span>
+              <span class="tg"><em class="t-m">Medido</em><code>app/controllers/auth_controller_test.go:142</code></span>
+            </span>
+            <span class="go">Abrir Testes</span>
+          </button></li>
+          <!-- NEW: what DiffLens measured in one function is one row, ranked by its most urgent part: here a correctness
+               check (rank of a tool check) carries the three limits with it. -->
+          <li class="sig"><button type="button" class="lrow" data-goto="flow">
+            <span class="rk">4</span>
+            <span class="bd">
+              <strong>AuthService.authenticate tem um achado do staticcheck e passa de 3 limites</strong>
+              <span class="dt">Linha 96: <span lang="en">this value of err is never used</span>. Complexidade 14, CRAP 42 e 48% das linhas alteradas cobertas; os limites são 10, 30 e 80%.</span>
+              <span class="tg"><em class="t-m">Medido</em><em class="tool"><svg class="wrench" aria-hidden="true"><use href="#wrench"/></svg>staticcheck<code>SA4006</code></em><em class="lim"><svg class="gauge" aria-hidden="true"><use href="#gauge"/></svg>3 limites</em><code>app/services/auth_service/auth_service.go:73</code></span>
+            </span>
+            <span class="go">Abrir no Flow</span>
+          </button></li>
+          <li class="sig"><button type="button" class="lrow" data-goto="flow:n-ldap">
+            <span class="rk">5</span>
+            <span class="bd">
+              <strong>go vet aponta um problema em Client.Bind</strong>
+              <span class="dt">Linha 31: <span lang="en">fmt.Sprintf format %d has arg login of wrong type string</span></span>
+              <span class="tg"><em class="t-m">Medido</em><em class="tool"><svg class="wrench" aria-hidden="true"><use href="#wrench"/></svg>go vet<code>printf</code></em><code>app/clients/ldap_client/bind.go:31</code></span>
+            </span>
+            <span class="go">Abrir no Flow</span>
+          </button></li>
+        </ol>
+
+        <!-- NEW: continues "Onde olhar primeiro" with the findings that did not fit there. Absent when none is left. -->
+        <section class="sig" aria-labelledby="sugg-t">
+          <h2 class="sect" id="sugg-t">O modelo sugere mudar <em class="t-ai">Modelo</em><span class="n">6 além dos 2 acima</span></h2>
+          <ol class="sugg" aria-labelledby="sugg-t">
+            <li><button type="button" class="srow" data-goto="diff" aria-label="Média: Contador de tentativas é lido e gravado sem trava, app/services/auth_service/lockout.go:33. Abrir no Diff">
+              <em class="sev s-med"><svg class="bars" aria-hidden="true"><use href="#sev-2"/></svg>Média</em>
+              <span class="tt"><span>Contador de tentativas é lido e gravado sem trava</span><code title="app/services/auth_service/lockout.go:33">lockout.go:33</code></span>
+              <span class="go">Abrir no Diff</span>
+            </button></li>
+            <li><button type="button" class="srow" data-goto="mf-4" aria-label="Média: Usuário desativado no AD ainda entra pela senha local, app/services/auth_service/auth_service.go:91. Abrir no Diff">
+              <em class="sev s-med"><svg class="bars" aria-hidden="true"><use href="#sev-2"/></svg>Média</em>
+              <span class="tt"><span>Usuário desativado no AD ainda entra pela senha local</span><code title="app/services/auth_service/auth_service.go:91">auth_service.go:91</code></span>
+              <span class="go">Abrir no Diff</span>
+            </button></li>
+            <li><button type="button" class="srow" data-goto="mf-5" aria-label="Média: Nenhum teste cobre o fallback quando o AD não responde, app/services/auth_service/auth_service.go:84. Abrir no Diff">
+              <em class="sev s-med"><svg class="bars" aria-hidden="true"><use href="#sev-2"/></svg>Média</em>
+              <span class="tt"><span>Nenhum teste cobre o fallback quando o AD não responde</span><code title="app/services/auth_service/auth_service.go:84">auth_service.go:84</code></span>
+              <span class="go">Abrir no Diff</span>
+            </button></li>
+            <li><button type="button" class="srow" data-goto="mf-6" aria-label="Baixa: Login pelo fallback não fica registrado como local, app/services/auth_service/auth_service.go:98. Abrir no Diff">
+              <em class="sev s-low"><svg class="bars" aria-hidden="true"><use href="#sev-1"/></svg>Baixa</em>
+              <span class="tt"><span>Login pelo fallback não fica registrado como local</span><code title="app/services/auth_service/auth_service.go:98">auth_service.go:98</code></span>
+              <span class="go">Abrir no Diff</span>
+            </button></li>
+            <li><button type="button" class="srow" data-goto="diff" aria-label="Baixa: Custo mínimo do bcrypt fixo no código, fora da configuração, app/services/auth_service/crypt.go:52. Abrir no Diff">
+              <em class="sev s-low"><svg class="bars" aria-hidden="true"><use href="#sev-1"/></svg>Baixa</em>
+              <span class="tt"><span>Custo mínimo do bcrypt fixo no código, fora da configuração</span><code title="app/services/auth_service/crypt.go:52">crypt.go:52</code></span>
+              <span class="go">Abrir no Diff</span>
+            </button></li>
+          </ol>
+          <p class="suggfoot"><button type="button" class="linkish">Ver os 8 achados no Insights</button><span>mais 1 de gravidade baixa só lá</span></p>
+        </section>
+
+        <h2 class="sect">Fora da análise</h2>
+        <ul class="muted" style="padding-left:18px"><li><code>app/services/auth_service/testdata/ad_fixture.ldif</code> não é enviado ao modelo: é grande demais para ler.</li></ul>
+      </div>
+
+      <div>
+        <h2 class="sect first">Medido nesta branch</h2>
+        <dl class="kv">
+          <dt>Testes</dt><dd><b>1.284</b> passando, <b class="d">1</b> falhando<small>6 adicionados nesta branch</small></dd>
+          <dt>Cobertura das linhas alteradas</dt><dd><b>71%</b><small>a meta para linhas alteradas é 80%</small></dd>
+          <dt>Funções acima de um limite</dt><dd><b class="sig">2</b><b class="clean">0</b><small>complexidade 10, CRAP 30, cobertura 80%<span class="sig">; nenhuma é nova</span></small></dd>
+          <dt>Funções alteradas que nenhum teste executa</dt><dd><b class="sig">1</b><b class="clean">0</b></dd>
+          <dt>Checagens estáticas</dt><dd><span class="sig"><b>3</b> achados<small>staticcheck 2, go vet 1</small></span><span class="clean">Sem achados<small>go vet e staticcheck</small></span></dd>
+        </dl>
+        <h2 class="sect">Forma da mudança</h2>
+        <dl class="kv">
+          <dt>Pontos de entrada</dt><dd>1 afetado</dd>
+          <dt>Diretórios</dt><dd>1 novo</dd>
+          <dt>Arquivos</dt><dd>3 adicionados, 1 excluído</dd>
+          <dt>Banco de dados</dt><dd>Nenhuma migração alterada</dd>
+          <dt>Dependências</dt><dd><code>go.mod</code> alterado</dd>
+        </dl>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===================== FLOW ===================== -->
+  <main class="flow" data-sec="flow" aria-label="Flow" hidden>
+    <div class="ftools">
+      <div class="seg" role="group" aria-label="Escopo"><span class="on">Esta branch</span><span style="opacity:.45">App inteiro</span></div>
+      <div class="seg" role="group" aria-label="Nível"><span>Pacotes</span><span>Arquivos</span><span class="on">Funções</span></div>
+      <span class="opt">Incluir testes (6)</span>
+      <span class="opt on">Mostrar o que elas chamam (3)</span>
+      <ul class="legend" aria-label="Estados das funções">
+        <li><i class="dot new" aria-hidden="true"></i>Nova</li><li><i class="dot mod" aria-hidden="true"></i>Modificada</li><li><i class="dot del" aria-hidden="true"></i>Excluída</li><li><i class="dot same" aria-hidden="true"></i>Inalterada</li>
+      </ul>
+      <ul class="legend" aria-label="Marcas de revisão">
+        <li><b class="a" aria-hidden="true">✓</b>Revisada</li><li><i class="ring" aria-hidden="true"></i>Alterada desde a sua revisão</li>
+      </ul>
+      <!-- NEW legend group. Only drawn when some box carries a badge, like the states above. -->
+      <ul class="legend sig-legend sig" aria-label="Achados, limites e checagens">
+        <li><span class="lbl">Achado do modelo, pelo mais grave:</span></li>
+        <li><svg class="bars s-high" aria-hidden="true"><use href="#sev-3"/></svg>Alta</li>
+        <li><svg class="bars s-med" aria-hidden="true"><use href="#sev-2"/></svg>Média</li>
+        <li><svg class="bars s-low" aria-hidden="true"><use href="#sev-1"/></svg>Baixa</li>
+        <li><svg class="gauge" aria-hidden="true"><use href="#gauge"/></svg>Acima de um limite de qualidade</li>
+        <li><svg class="wrench" aria-hidden="true"><use href="#wrench"/></svg>Achado de checagem estática (go vet, staticcheck)</li>
+        <li><svg class="notest" aria-hidden="true"><use href="#notest"/></svg>Nenhum teste a executa</li>
+        <li class="lbl">O número diz quantos, quando é mais de um</li>
+      </ul>
+      <ul class="legend links" aria-label="Conexões">
+        <li><svg width="22" height="6" aria-hidden="true"><path d="M1 3h20" class="edge"/></svg>Chama</li>
+        <li><svg width="22" height="6" aria-hidden="true"><path d="M1 3h20" class="edge added"/></svg>Adicionada nesta revisão</li>
+        <li><svg width="22" height="6" aria-hidden="true"><path d="M1 3h20" class="edge"/></svg>Já existia, as duas pontas mudaram</li>
+        <li><svg width="22" height="6" aria-hidden="true"><path d="M1 3h20" class="edge removed"/></svg><b class="d" aria-hidden="true">×</b>Removida nesta revisão</li>
+      </ul>
+    </div>
+
+    <div class="canvas" role="region" aria-label="Flow das funções alteradas">
+      <div class="world">
+        <svg class="edges" aria-hidden="true">
+          <path class="edge" d="M230 291 L294 291"/>
+          <path class="edge removed" d="M230 291 C262 291 262 457 294 457"/>
+          <text class="xmark" x="257" y="379">×</text>
+          <path class="edge added" d="M514 291 C557 291 557 117 600 117"/>
+          <path class="edge added" d="M514 291 C557 291 557 217 600 217"/>
+          <path class="edge" d="M514 291 C557 291 557 457 600 457"/>
+          <path class="edge" d="M514 291 C722 291 722 321 930 321"/>
+          <path class="edge added" d="M810 117 L930 117"/>
+        </svg>
+
+        <div class="ctr" style="left:270px; top:24px; width:564px; height:492px">
+          <header><span class="faint" aria-hidden="true">▾</span><svg width="14" height="14" class="muted" aria-hidden="true"><use href="#pkg"/></svg><code>app/services/auth_service</code><span class="faint">4 arquivos, 5 funções alteradas</span><span class="mono" style="margin-left:auto"><span class="a">+76</span> <span class="d">−29</span></span></header>
+        </div>
+
+        <div class="fn" style="left:30px; top:260px; width:200px">
+          <button type="button" class="box" aria-label="AuthController.Login, modificada, 6 adicionadas, 2 removidas, ponto de entrada POST /login">
+            <span class="sbar mod" aria-hidden="true"></span><span class="nm">AuthController.Login</span><span class="dt">controllers</span><span class="lc"><span class="a">+6</span><span class="d">−2</span></span>
+          </button>
+        </div>
+
+        <div class="fn sel" id="n-auth" style="left:294px; top:260px; width:220px">
+          <button type="button" class="box" data-pop="pop-auth" aria-haspopup="dialog" aria-expanded="true" aria-controls="pop-auth"
+            aria-label="AuthService.authenticate, modificada, 12 adicionadas, 2 removidas, 4 achados do modelo, o mais grave de gravidade alta, 3 limites ultrapassados, 1 achado de checagem estática"
+            data-label-clean="AuthService.authenticate, modificada, 12 adicionadas, 2 removidas">
+            <span class="sbar mod" aria-hidden="true"></span><span class="nm">AuthService.authenticate</span><span class="dt">auth_service.go</span><span class="lc"><span class="a">+12</span><span class="d">−2</span></span>
+          </button>
+          <span class="sigb sig" aria-hidden="true"><span class="s-high"><svg class="bars"><use href="#sev-3"/></svg>4</span><i></i><span><svg class="gauge"><use href="#gauge"/></svg>3</span><i></i><span><svg class="wrench"><use href="#wrench"/></svg></span></span>
+        </div>
+
+        <div class="fn gone" style="left:294px; top:426px; width:220px">
+          <button type="button" class="box" aria-label="AuthService.legacyLogin, excluída, 0 adicionadas, 24 removidas">
+            <span class="sbar del" aria-hidden="true"></span><span class="nm">AuthService.legacyLogin</span><span class="dt">legacy.go</span><span class="lc"><span class="a">+0</span><span class="d">−24</span></span>
+          </button>
+        </div>
+
+        <div class="fn" style="left:600px; top:86px; width:210px">
+          <button type="button" class="box" aria-label="AuthService.bindAD, nova, 41 adicionadas, 0 removidas, revisada, 1 achado de checagem estática"
+            data-label-clean="AuthService.bindAD, nova, 41 adicionadas, 0 removidas, revisada">
+            <span class="sbar new" aria-hidden="true"></span><span class="nm">AuthService.bindAD</span><span class="dt">ad.go</span><span class="lc"><span class="a">+41</span><span class="d">−0</span></span>
+          </button>
+          <span class="tick" aria-hidden="true">✓</span>
+          <!-- Only a tool finding (staticcheck ST1005, ad.go:62): the wrench alone, the review tick untouched. -->
+          <span class="sigb sig" aria-hidden="true"><span><svg class="wrench"><use href="#wrench"/></svg></span></span>
+        </div>
+
+        <div class="fn" style="left:600px; top:186px; width:210px">
+          <button type="button" class="box" data-pop="pop-crypt" aria-haspopup="dialog" aria-expanded="false" aria-controls="pop-crypt"
+            aria-label="isOldCryptCost, nova, 10 adicionadas, 0 removidas, 2 achados do modelo, o mais grave de gravidade alta, nenhum teste a executa"
+            data-label-clean="isOldCryptCost, nova, 10 adicionadas, 0 removidas">
+            <span class="sbar new" aria-hidden="true"></span><span class="nm">isOldCryptCost</span><span class="dt">crypt.go</span><span class="lc"><span class="a">+10</span><span class="d">−0</span></span>
+          </button>
+          <span class="sigb sig" aria-hidden="true"><span class="s-high"><svg class="bars"><use href="#sev-3"/></svg>2</span><i></i><span><svg class="notest"><use href="#notest"/></svg></span></span>
+        </div>
+
+        <div class="fn" style="left:600px; top:426px; width:210px">
+          <button type="button" class="box" aria-label="LockoutTracker.register, modificada, 9 adicionadas, 3 removidas, 1 achado do modelo, de gravidade média, 1 limite ultrapassado"
+            data-label-clean="LockoutTracker.register, modificada, 9 adicionadas, 3 removidas">
+            <span class="sbar mod" aria-hidden="true"></span><span class="nm">LockoutTracker.register</span><span class="dt">lockout.go</span><span class="lc"><span class="a">+9</span><span class="d">−3</span></span>
+          </button>
+          <span class="sigb sig" aria-hidden="true"><span class="s-med"><svg class="bars"><use href="#sev-2"/></svg></span><i></i><span><svg class="gauge"><use href="#gauge"/></svg></span></span>
+        </div>
+
+        <div class="fn grp" id="n-ldap" style="left:930px; top:86px; width:220px">
+          <button type="button" class="box" aria-label="app/clients/ldap_client, pacote, 2 arquivos, 2 funções alteradas, 58 adicionadas, 0 removidas, 1 achado do modelo, de gravidade baixa, 1 achado de checagem estática"
+            data-label-clean="app/clients/ldap_client, pacote, 2 arquivos, 2 funções alteradas, 58 adicionadas, 0 removidas">
+            <span class="nmrow"><svg width="14" height="14" class="muted" aria-hidden="true"><use href="#pkg"/></svg><span class="nm">ldap_client</span></span>
+            <span class="dt">2 arquivos, 2 funções alteradas</span><span class="lc"><span class="a">+58</span><span class="d">−0</span></span>
+            <span class="chevr" aria-hidden="true">›</span>
+          </button>
+          <!-- Aggregated: the low finding of client.go and the go vet finding of bind.go. -->
+          <span class="sigb sig" aria-hidden="true"><span class="s-low"><svg class="bars"><use href="#sev-1"/></svg></span><i></i><span><svg class="wrench"><use href="#wrench"/></svg></span></span>
+        </div>
+
+        <div class="fn same" style="left:930px; top:290px; width:220px">
+          <button type="button" class="box" aria-label="UserRepo.FindByLogin, inalterada">
+            <span class="sbar same" aria-hidden="true"></span><span class="nm">UserRepo.FindByLogin</span><span class="dt">user_repo</span>
+          </button>
+        </div>
+
+        <!-- The popover of AuthService.authenticate, beside it as FlowPopover places it (right side, caret at the node's middle). -->
+        <div class="pop" id="pop-auth" role="dialog" aria-labelledby="pop-t" style="left:532px; top:12px; --caret:279px">
+          <header>
+            <h3><span id="pop-t">AuthService.authenticate</span><button type="button" class="x" aria-label="Fechar">✕</button></h3>
+            <p class="sub"><i class="dot mod" aria-hidden="true"></i><span>Modificada</span><span class="mono"><span class="a">+12</span> <span class="d">−2</span></span><code>app/services/auth_service/auth_service.go:73–99</code></p>
+          </header>
+          <div class="pbody">
+            <p>Alterada nesta revisão.</p>
+            <dl class="facts">
+              <dt class="clean">Complexidade ciclomática</dt><dd class="clean">6 → 8</dd>
+              <dt>Chamadores exibidos</dt><dd>1</dd>
+              <dt>Chamadas exibidas</dt><dd>4, e 1 chamada removida</dd>
+            </dl>
+
+            <!-- NEW: only when the function crosses a limit. The complexity row moves here from the facts above. -->
+            <section class="psec sig" aria-labelledby="pl-t">
+              <h4 id="pl-t">Limites de qualidade<em class="lim"><svg class="gauge" aria-hidden="true"><use href="#gauge"/></svg>3 ultrapassados</em><button type="button" class="linkish r" aria-label="Abrir na aba Qualidade">Qualidade</button></h4>
+
+              <dl class="lims">
+                <dt><svg class="gauge g" aria-hidden="true"><use href="#gauge"/></svg><span>Complexidade ciclomática<small>9 antes desta branch</small></span></dt>
+                <dd><b class="over">14</b> <span class="of">/ limite 10</span></dd>
+                <dt><svg class="gauge g" aria-hidden="true"><use href="#gauge"/></svg><span>CRAP<small>junta a complexidade e a cobertura</small></span></dt>
+                <dd><b class="over">42</b> <span class="of">/ limite 30</span></dd>
+                <dt><svg class="gauge g" aria-hidden="true"><use href="#gauge"/></svg><span>Cobertura das linhas alteradas<small>12 de 25 linhas rodaram nos testes</small></span></dt>
+                <dd><b class="over">48%</b> <span class="of">/ mínimo 80%</span></dd>
+              </dl>
+            </section>
+
+            <!-- NEW: only when a tool reported something inside this function. Measured, so it comes before the model. -->
+            <section class="psec sig" aria-labelledby="pk-t">
+              <h4 id="pk-t">Checagens estáticas<em class="tool"><svg class="wrench" aria-hidden="true"><use href="#wrench"/></svg>1 achado</em><button type="button" class="linkish r" aria-label="Abrir na aba Qualidade">Qualidade</button></h4>
+              <ol class="pfind">
+                <li><em class="tool">staticcheck<code>SA4006</code></em>
+                  <button type="button" class="t" data-goto="ck-1" lang="en">this value of err is never used</button>
+                  <button type="button" class="mini" data-goto="ck-1" aria-label="Ver no Diff, linha 96">Diff</button>
+                  <small>Linha 96</small></li>
+              </ol>
+              <p class="caveat">Medido pela ferramenta; a mensagem é a dela, sem tradução.</p>
+            </section>
+
+            <!-- NEW: the model's findings inside this function, most severe first. -->
+            <section class="psec sig" aria-labelledby="pf-t">
+              <h4 id="pf-t">Achados do modelo <em class="t-ai">Modelo</em><button type="button" class="linkish r" aria-label="Abrir no Insights">Insights</button></h4>
+              <ol class="pfind">
+                <li><em class="sev s-high"><svg class="bars" aria-hidden="true"><use href="#sev-3"/></svg>Alta</em>
+                  <button type="button" class="t" data-goto="mf-1">Erro do AD não é registrado antes de cair no fallback</button>
+                  <button type="button" class="mini" data-goto="mf-1" aria-label="Ver no Diff, linha 85">Diff</button>
+                  <small>Tratamento de erros, linhas 85–89</small></li>
+                <li><em class="sev s-med"><svg class="bars" aria-hidden="true"><use href="#sev-2"/></svg>Média</em>
+                  <button type="button" class="t" data-goto="mf-4">Usuário desativado no AD ainda entra pela senha local</button>
+                  <button type="button" class="mini" data-goto="mf-4" aria-label="Ver no Diff, linha 91">Diff</button>
+                  <small>Corretude, linha 91</small></li>
+                <li><em class="sev s-med"><svg class="bars" aria-hidden="true"><use href="#sev-2"/></svg>Média</em>
+                  <button type="button" class="t" data-goto="mf-5">Nenhum teste cobre o fallback quando o AD não responde</button>
+                  <button type="button" class="mini" data-goto="mf-5" aria-label="Ver no Diff, linha 84">Diff</button>
+                  <small>Testes, linhas 84–90</small></li>
+                <li><em class="sev s-low"><svg class="bars" aria-hidden="true"><use href="#sev-1"/></svg>Baixa</em>
+                  <button type="button" class="t" data-goto="mf-6">Login pelo fallback não fica registrado como local</button>
+                  <button type="button" class="mini" data-goto="mf-6" aria-label="Ver no Diff, linha 98">Diff</button>
+                  <small>Observabilidade, linha 98</small></li>
+              </ol>
+              <p class="caveat">Lido pelo modelo, não medido. Confira antes de confiar.</p>
+            </section>
+
+            <section class="psec" aria-labelledby="pc-t">
+              <h4 id="pc-t">Chamadas e registros, por linha</h4>
+              <ol class="calls">
+                <li><button type="button">UserRepo.FindByLogin</button><span class="faint">linha 77</span></li>
+                <li><span class="muted">LockoutTracker.Locked</span><span class="faint">linha 81</span><span class="r faint">não exibida</span></li>
+                <li><span class="muted gone">AuthService.legacyLogin</span><span class="faint">linha 84</span><span class="r d">removida</span></li>
+                <li><button type="button">AuthService.bindAD</button><span class="faint">linha 85</span><span class="r a">adicionada</span></li>
+                <li><button type="button">LockoutTracker.register</button><span class="faint">linha 92</span></li>
+                <li><button type="button">isOldCryptCost</button><span class="faint">linha 95</span><span class="r a">adicionada</span></li>
+              </ol>
+            </section>
+          </div>
+          <footer>
+            <span>Medido por difflens-go 0.14.2</span>
+            <span class="acts"><button type="button" class="secondary sm">Marcar como revisado</button><button type="button" class="primary sm" data-goto="diff">Ver diff de auth_service.go</button></span>
+          </footer>
+        </div>
+
+        <!-- The popover of isOldCryptCost: a new function no test executes. -->
+        <div class="pop" id="pop-crypt" role="dialog" aria-labelledby="pop-crypt-t" style="left:828px; top:12px; --caret:205px" hidden>
+          <header>
+            <h3><span id="pop-crypt-t">isOldCryptCost</span><button type="button" class="x" aria-label="Fechar">✕</button></h3>
+            <p class="sub"><i class="dot new" aria-hidden="true"></i><span>Nova</span><span class="mono"><span class="a">+10</span> <span class="d">−0</span></span><code>app/services/auth_service/crypt.go:44–53</code></p>
+          </header>
+          <div class="pbody">
+            <p>Nova nesta revisão.</p>
+            <dl class="facts">
+              <dt class="clean">Complexidade ciclomática</dt><dd class="clean">2</dd>
+              <dt>Chamadores exibidos</dt><dd>1</dd>
+              <dt>Chamadas exibidas</dt><dd>0</dd>
+            </dl>
+
+            <!-- No test executes it: the coverage limit shows as the no-test mark, not as a gauge, and counts once. -->
+            <section class="psec sig" aria-labelledby="pcl-t">
+              <h4 id="pcl-t">Limites de qualidade<em class="lim"><svg class="notest" aria-hidden="true"><use href="#notest"/></svg>sem teste</em><button type="button" class="linkish r" aria-label="Abrir na aba Qualidade">Qualidade</button></h4>
+              <dl class="lims">
+                <dt><svg class="notest g" aria-hidden="true"><use href="#notest"/></svg><span>Nenhum teste executa esta função<small>cobertura das 9 linhas alteradas</small></span></dt>
+                <dd><b class="over">0%</b> <span class="of">/ mínimo 80%</span></dd>
+                <dt><span></span><span>Complexidade ciclomática</span></dt>
+                <dd>2 <span class="of">/ limite 10</span></dd>
+                <dt><span></span><span>CRAP</span></dt>
+                <dd>6 <span class="of">/ limite 30</span></dd>
+              </dl>
+            </section>
+
+            <section class="psec sig" aria-labelledby="pcf-t">
+              <h4 id="pcf-t">Achados do modelo <em class="t-ai">Modelo</em><button type="button" class="linkish r" aria-label="Abrir no Insights">Insights</button></h4>
+              <ol class="pfind">
+                <li><em class="sev s-high"><svg class="bars" aria-hidden="true"><use href="#sev-3"/></svg>Alta</em>
+                  <button type="button" class="t" data-goto="mf-c1">isOldCryptCost lê o custo na posição errada do hash</button>
+                  <button type="button" class="mini" data-goto="mf-c1" aria-label="Ver no Diff, linha 47">Diff</button>
+                  <small>Corretude, linha 47</small></li>
+                <li><em class="sev s-low"><svg class="bars" aria-hidden="true"><use href="#sev-1"/></svg>Baixa</em>
+                  <button type="button" class="t" data-goto="mf-c2">Custo mínimo do bcrypt fixo no código, fora da configuração</button>
+                  <button type="button" class="mini" data-goto="mf-c2" aria-label="Ver no Diff, linha 52">Diff</button>
+                  <small>Configuração, linha 52</small></li>
+              </ol>
+              <p class="caveat">Lido pelo modelo, não medido. Confira antes de confiar.</p>
+            </section>
+          </div>
+          <footer>
+            <span>Medido por difflens-go 0.14.2</span>
+            <span class="acts"><button type="button" class="secondary sm">Marcar como revisado</button><button type="button" class="primary sm" data-goto="f-crypt">Ver diff de crypt.go</button></span>
+          </footer>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===================== DIFF ===================== -->
+  <main class="diffv" data-sec="diff" aria-label="Diff" hidden>
+    <div class="dtools">
+      <div class="seg" role="group" aria-label="Exibir"><span class="on">Arquivos</span><span>Comentários (2)</span></div>
+      <div class="seg" role="group" aria-label="Linhas exibidas"><span class="on">Só alterações</span><span>Arquivo inteiro</span></div>
+      <div class="seg" role="group" aria-label="Comparação"><span class="on">Branch inteira</span><span>Desde a última revisão</span></div>
+      <div class="seg" role="group" aria-label="Layout"><span class="on">Unificado</span><span>Lado a lado</span></div>
+      <!-- NEW: only when the review has findings. Hides the blocks and the range bars; the limit markers stay (measured). -->
+      <label class="ftog sig" title="Os achados descartados nunca aparecem aqui, a não ser recolhidos numa linha"><input type="checkbox" id="show-findings" data-hides="no-findings" checked>Mostrar achados do modelo<em class="t-ai">4 neste arquivo</em></label>
+      <!-- NEW: a toggle of its own, only when some tool reported something. Hides the check rows and their lane marks. -->
+      <label class="ftog ckt sig" title="Achados do go vet e do staticcheck nas linhas alteradas"><input type="checkbox" id="show-checks" data-hides="no-checks" checked>Mostrar checagens<em class="tool"><svg class="wrench" aria-hidden="true"><use href="#wrench"/></svg>1 neste arquivo</em></label>
+      <button type="button" class="primary sm" id="publish">Publicar comentários (<span id="pub-n">1</span>)</button>
+      <div class="right"><span>Clique em uma linha para comentar</span><span><kbd>j</kbd> <kbd>k</kbd> ou <kbd>]</kbd> <kbd>[</kbd> arquivo seguinte e anterior</span></div>
+    </div>
+    <div class="dwrap">
+      <nav class="flist" aria-label="Arquivos alterados">
+        <h3>23 arquivos alterados</h3>
+        <ul>
+          <li class="on"><i class="dot mod" aria-hidden="true"></i><span>auth_service.go</span><small><span class="a">+12</span> <span class="d">−2</span></small></li>
+          <li><i class="dot new" aria-hidden="true"></i><span>ad.go</span><small><span class="a">+41</span></small></li>
+          <li><i class="dot mod" aria-hidden="true"></i><span>crypt.go</span><small><span class="a">+14</span></small></li>
+          <li><i class="dot mod" aria-hidden="true"></i><span>lockout.go</span><small><span class="a">+9</span> <span class="d">−3</span></small></li>
+          <li><i class="dot del" aria-hidden="true"></i><span>legacy.go</span><small><span class="d">−24</span></small></li>
+          <li><i class="dot new" aria-hidden="true"></i><span>ldap_client/client.go</span><small><span class="a">+41</span></small></li>
+          <li><i class="dot new" aria-hidden="true"></i><span>ldap_client/bind.go</span><small><span class="a">+17</span></small></li>
+          <li><i class="dot mod" aria-hidden="true"></i><span>auth_controller.go</span><small><span class="a">+6</span> <span class="d">−2</span></small></li>
+        </ul>
+      </nav>
+
+      <div class="dmain" id="dmain">
+        <section class="dfile" aria-label="app/services/auth_service/auth_service.go">
+        <div class="fhead">
+          <code>app/services/auth_service/auth_service.go</code>
+          <span class="mono"><span class="a">+12</span> <span class="d">−2</span></span>
+          <span class="sigs sig"><em class="sev s-high"><svg class="bars" aria-hidden="true"><use href="#sev-3"/></svg>4 achados</em><em class="lim"><svg class="gauge" aria-hidden="true"><use href="#gauge"/></svg>3 limites</em><em class="tool"><svg class="wrench" aria-hidden="true"><use href="#wrench"/></svg>1 checagem</em></span>
+          <button type="button" class="secondary sm">Marcar como revisado</button>
+        </div>
+
+        <div class="fold">70 linhas inalteradas ocultas</div>
+        <div class="ln ctx"><i>71</i><i>71</i><span class="lane"></span><span class="c"><span class="cm">// authenticate checks the credentials against Active Directory first and</span></span></div>
+        <div class="ln ctx"><i>72</i><i>72</i><span class="lane"></span><span class="c"><span class="cm">// falls back to the local password when the directory does not answer.</span></span></div>
+        <div class="ln ctx"><i>73</i><i>73</i><span class="lane"><svg class="gauge sig" aria-hidden="true"><use href="#gauge"/></svg></span><span class="c"><span>func (s *AuthService) authenticate(ctx context.Context, login, password string) (*User, error) {</span>
+          <button type="button" class="limpill sig" id="lim-btn" aria-expanded="false" aria-controls="lim-panel"
+            title="Complexidade ciclomática 14, o limite é 10. CRAP 42, o limite é 30. Cobertura das linhas alteradas 48%, o mínimo é 80%."
+            aria-label="AuthService.authenticate acima de 3 limites: complexidade ciclomática 14, CRAP 42, cobertura das linhas alteradas 48%. Mostrar os limites"><svg class="gauge" aria-hidden="true"><use href="#gauge"/></svg>CC <b>14</b> · CRAP <b>42</b> · cobertura <b>48%</b></button></span></div>
+        <div class="limpanel sig" id="lim-panel" hidden>
+          <header><em class="t-m">Medido</em><strong>AuthService.authenticate está acima de 3 limites</strong></header>
+          <dl class="lims">
+            <dt><svg class="gauge g" aria-hidden="true"><use href="#gauge"/></svg><span>Complexidade ciclomática<small>9 antes desta branch</small></span></dt><dd><b class="over">14</b> <span class="of">/ limite 10</span></dd>
+            <dt><svg class="gauge g" aria-hidden="true"><use href="#gauge"/></svg><span>CRAP</span></dt><dd><b class="over">42</b> <span class="of">/ limite 30</span></dd>
+            <dt><svg class="gauge g" aria-hidden="true"><use href="#gauge"/></svg><span>Cobertura das linhas alteradas<small>12 de 25 linhas rodaram nos testes</small></span></dt><dd><b class="over">48%</b> <span class="of">/ mínimo 80%</span></dd>
+          </dl>
+          <footer><button type="button" class="linkish">Abrir em Qualidade</button></footer>
+        </div>
+        <div class="ln ctx"><i>74</i><i>74</i><span class="lane"></span><span class="c"><span>	if login == "" || password == "" {</span></span></div>
+        <div class="ln ctx"><i>75</i><i>75</i><span class="lane"></span><span class="c"><span>		return nil, ErrInvalidCredentials</span></span></div>
+        <div class="ln ctx"><i>76</i><i>76</i><span class="lane"></span><span class="c"><span>	}</span></span></div>
+        <div class="ln ctx"><i>77</i><i>77</i><span class="lane"></span><span class="c"><span>	user, err := s.users.FindByLogin(ctx, login)</span></span></div>
+        <div class="ln ctx"><i>78</i><i>78</i><span class="lane"></span><span class="c"><span>	if err != nil {</span></span></div>
+        <div class="ln ctx"><i>79</i><i>79</i><span class="lane"></span><span class="c"><span>		return nil, fmt.Errorf("find user %q: %w", login, err)</span></span></div>
+        <!-- A dismissed finding: folded to one line, like a resolved comment. It counts nowhere else. -->
+        <div class="mf dismissed sig" data-open="false" role="group" aria-label="Achado do modelo, descartado">
+          <div class="mf-h"><em class="t-ai">Modelo</em><span class="faint">Descartado</span><strong>Login do usuário aparece na mensagem de erro</strong><span class="loc">Segurança, linha 79</span><button type="button" class="linkish tog" aria-expanded="false">Mostrar</button></div>
+          <div class="mf-b"><p>O erro devolvido inclui o login pesquisado. Ele só vai para o log interno, mas acaba no corpo da resposta se o handler repassar a mensagem.</p><p class="faint" style="margin-top:6px">Você descartou isto em 18 de nov.</p></div>
+        </div>
+        <div class="ln ctx"><i>80</i><i>80</i><span class="lane"></span><span class="c"><span>	}</span></span></div>
+        <div class="ln ctx"><i>81</i><i>81</i><span class="lane"></span><span class="c"><span>	if s.lockout.Locked(user.ID) {</span></span></div>
+        <div class="ln ctx"><i>82</i><i>82</i><span class="lane"></span><span class="c"><span>		return nil, ErrAccountLocked</span></span></div>
+        <div class="ln ctx"><i>83</i><i>83</i><span class="lane"></span><span class="c"><span>	}</span></span></div>
+        <div class="ln add rng rs"><i></i><i>84</i><span class="lane"></span><span class="c"><span>	if s.adEnabled {</span></span></div>
+        <div class="ln add rng"><i></i><i>85</i><span class="lane"></span><span class="c"><span>		ok, err := s.bindAD(ctx, login, password)</span></span></div>
+        <div class="ln add rng"><i></i><i>86</i><span class="lane"></span><span class="c"><span>		if err == nil {</span></span></div>
+        <div class="ln add rng"><i></i><i>87</i><span class="lane"></span><span class="c"><span>			return s.finishLogin(ctx, user, ok)</span></span></div>
+        <div class="ln add rng"><i></i><i>88</i><span class="lane"></span><span class="c"><span>		}</span></span></div>
+        <div class="ln add rng"><i></i><i>89</i><span class="lane"></span><span class="c"><span>		<span class="cm">// AD did not answer: fall back to the local password.</span></span></span></div>
+
+        <div class="mf sig" id="mf-1" data-open="true" role="group" aria-labelledby="mf-1-t" tabindex="-1">
+          <div class="mf-h"><em class="t-ai">Modelo</em><em class="sev s-high"><svg class="bars" aria-hidden="true"><use href="#sev-3"/></svg>Alta</em><strong id="mf-1-t">Erro do AD não é registrado antes de cair no fallback</strong><span class="loc">Tratamento de erros, linhas 85–89</span><button type="button" class="linkish tog" aria-expanded="true">Recolher</button></div>
+          <div class="mf-b">
+            <p>Quando <code>bindAD</code> devolve erro, o código segue para a senha local sem registrar nada. Se o AD sair do ar em produção, todo login passa a usar o banco local e ninguém fica sabendo: não há log, métrica nem alerta.</p>
+            <dl><dt>Direção sugerida</dt><dd>Registre o erro com <code>log.Warn</code>, com o login e o host do AD, antes do fallback, e conte os fallbacks numa métrica para alertar quando o AD parar de responder.</dd></dl>
+            <div class="mf-acts">
+              <button type="button" class="aibtn mkd" data-tpl="draft-tpl" data-slot="draft-slot">Criar rascunho de comentário</button>
+              <button type="button" class="linkish">Abrir no Insights</button>
+              <span class="faint" style="font-size:12px">Lido pelo modelo, não medido. Confira antes de confiar.</span>
+            </div>
+          </div>
+        </div>
+        <div id="draft-slot"></div>
+
+        <div class="ln add rng re"><i></i><i>90</i><span class="lane"></span><span class="c"><span>	}</span></span></div>
+        <div class="mf sig" id="mf-5" data-open="true" role="group" aria-labelledby="mf-5-t" tabindex="-1">
+          <div class="mf-h"><em class="t-ai">Modelo</em><em class="sev s-med"><svg class="bars" aria-hidden="true"><use href="#sev-2"/></svg>Média</em><strong id="mf-5-t">Nenhum teste cobre o fallback quando o AD não responde</strong><span class="loc">Testes, linhas 84–90</span><button type="button" class="linkish tog" aria-expanded="true">Recolher</button></div>
+          <div class="mf-b">
+            <p>Os testes novos simulam o AD aceitando e recusando a senha, mas nenhum simula timeout ou conexão recusada, que é justamente o caminho do fallback.</p>
+            <dl><dt>Direção sugerida</dt><dd>Adicione um caso em <code>TestAuthenticate</code> com um cliente LDAP falso que devolve um erro de rede, e confira que a senha local é usada.</dd></dl>
+            <div class="mf-acts"><button type="button" class="aibtn">Criar rascunho de comentário</button><button type="button" class="linkish">Abrir no Insights</button></div>
+          </div>
+        </div>
+
+        <div class="ln del"><i>84</i><i></i><span class="lane"></span><span class="c"><span>	if !s.legacyLogin(user, password) {</span></span></div>
+        <div class="ln add rng rs re"><i></i><i>91</i><span class="lane"></span><span class="c"><span>	if !bcrypt.Matches(user.PasswordHash, password) {</span></span></div>
+        <div class="mf sig" id="mf-4" data-open="true" role="group" aria-labelledby="mf-4-t" tabindex="-1">
+          <div class="mf-h"><em class="t-ai">Modelo</em><em class="sev s-med"><svg class="bars" aria-hidden="true"><use href="#sev-2"/></svg>Média</em><strong id="mf-4-t">Usuário desativado no AD ainda entra pela senha local</strong><span class="loc">Corretude, linha 91</span><button type="button" class="linkish tog" aria-expanded="true">Recolher</button></div>
+          <div class="mf-b">
+            <p>Quando o AD responde que a conta está desativada, <code>bindAD</code> devolve erro e o código trata isso como AD fora do ar: cai para a senha local, que continua válida.</p>
+            <dl><dt>Direção sugerida</dt><dd>Diferencie “o AD não respondeu” de “o AD recusou”: só o primeiro pode cair no fallback.</dd></dl>
+            <div class="mf-acts"><button type="button" class="aibtn">Criar rascunho de comentário</button><button type="button" class="linkish">Abrir no Insights</button></div>
+          </div>
+        </div>
+
+        <div class="ln ctx"><i>85</i><i>92</i><span class="lane"></span><span class="c"><span>		s.lockout.register(user.ID)</span></span></div>
+        <div class="cmt" role="group" aria-label="Comentário de Ana Ribeiro">
+          <div class="who"><b>Ana Ribeiro</b><span>há 2 h</span></div>
+          <p>O register já conta tentativas no Redis? Se sim, com o lockout do próprio AD a conta pode travar duas vezes.</p>
+          <div class="acts"><button type="button">Resolver</button><button type="button">Responder</button></div>
+        </div>
+        <div class="ln ctx"><i>86</i><i>93</i><span class="lane"></span><span class="c"><span>		return nil, ErrInvalidCredentials</span></span></div>
+        <div class="ln ctx"><i>87</i><i>94</i><span class="lane"></span><span class="c"><span>	}</span></span></div>
+        <div class="ln add"><i></i><i>95</i><span class="lane"></span><span class="c"><span>	if isOldCryptCost(user.PasswordHash) {</span></span></div>
+        <div class="ln add"><i></i><i>96</i><span class="lane"><svg class="wrench ckm sig" aria-hidden="true"><use href="#wrench"/></svg></span><span class="c"><span>		<span class="sig">err = </span>s.rehashLater(user.ID, password)</span></span></div>
+        <!-- NEW: a tool check under its line. The tool, its rule and its own message; the same draft button. -->
+        <div class="ck sig" id="ck-1" role="group" aria-label="Checagem estática: staticcheck SA4006, linha 96" tabindex="-1">
+          <em class="tool"><svg class="wrench" aria-hidden="true"><use href="#wrench"/></svg>staticcheck<code>SA4006</code></em>
+          <span class="msg" lang="en">this value of err is never used</span>
+          <span class="loc">linha 96</span>
+          <button type="button" class="secondary sm mkd" data-tpl="draft-ck-tpl" data-slot="draft-ck-slot">Criar rascunho de comentário</button>
+        </div>
+        <div id="draft-ck-slot"></div>
+        <div class="ln add"><i></i><i>97</i><span class="lane"></span><span class="c"><span>	}</span></span></div>
+        <div class="ln del"><i>88</i><i></i><span class="lane"></span><span class="c"><span>	return s.finishLogin(ctx, user)</span></span></div>
+        <div class="ln add rng rs re"><i></i><i>98</i><span class="lane"></span><span class="c"><span>	return s.finishLogin(ctx, user, false)</span></span></div>
+        <div class="mf sig" id="mf-6" data-open="true" role="group" aria-labelledby="mf-6-t" tabindex="-1">
+          <div class="mf-h"><em class="t-ai">Modelo</em><em class="sev s-low"><svg class="bars" aria-hidden="true"><use href="#sev-1"/></svg>Baixa</em><strong id="mf-6-t">Login pelo fallback não fica registrado como local</strong><span class="loc">Observabilidade, linha 98</span><button type="button" class="linkish tog" aria-expanded="true">Recolher</button></div>
+          <div class="mf-b">
+            <p><code>finishLogin</code> recebe <code>false</code> tanto no login local por escolha quanto no fallback; a auditoria não distingue os dois.</p>
+            <dl><dt>Direção sugerida</dt><dd>Passe a origem do login (AD, local ou fallback) para <code>finishLogin</code> e grave-a no evento de auditoria.</dd></dl>
+            <div class="mf-acts"><button type="button" class="aibtn">Criar rascunho de comentário</button><button type="button" class="linkish">Abrir no Insights</button></div>
+          </div>
+        </div>
+        <div class="ln ctx"><i>89</i><i>99</i><span class="lane"></span><span class="c"><span>}</span></span></div>
+        <div class="fold">27 linhas inalteradas ocultas</div>
+        </section>
+
+        <!-- NEW: the next file, for the function no test executes. -->
+        <section class="dfile" id="f-crypt" aria-label="app/services/auth_service/crypt.go" tabindex="-1">
+        <div class="fhead">
+          <code>app/services/auth_service/crypt.go</code>
+          <span class="mono"><span class="a">+14</span></span>
+          <span class="sigs sig"><em class="sev s-high"><svg class="bars" aria-hidden="true"><use href="#sev-3"/></svg>2 achados</em><em class="lim"><svg class="notest" aria-hidden="true"><use href="#notest"/></svg>1 função sem teste</em></span>
+          <button type="button" class="secondary sm">Marcar como revisado</button>
+        </div>
+        <div class="fold">43 linhas ocultas</div>
+        <div class="ln add"><i></i><i>44</i><span class="lane"><svg class="notest sig" aria-hidden="true"><use href="#notest"/></svg></span><span class="c"><span>func isOldCryptCost(hash string) bool {</span>
+          <span class="ntnote sig" title="Nenhuma das 9 linhas alteradas rodou em um teste. A cobertura delas é 0%, o mínimo é 80%."><svg class="notest" aria-hidden="true"><use href="#notest"/></svg>Nenhum teste executa esta função</span></span></div>
+        <div class="ln add"><i></i><i>45</i><span class="lane"></span><span class="c"><span>	<span class="cm">// A bcrypt hash reads "$2a$10$...": the cost follows the second "$".</span></span></span></div>
+        <div class="ln add"><i></i><i>46</i><span class="lane"></span><span class="c"><span>	const costAt = 3</span></span></div>
+        <div class="ln add rng rs re"><i></i><i>47</i><span class="lane"></span><span class="c"><span>	cost, err := strconv.Atoi(hash[costAt : costAt+2])</span></span></div>
+        <div class="mf sig" id="mf-c1" data-open="true" role="group" aria-labelledby="mf-c1-t" tabindex="-1">
+          <div class="mf-h"><em class="t-ai">Modelo</em><em class="sev s-high"><svg class="bars" aria-hidden="true"><use href="#sev-3"/></svg>Alta</em><strong id="mf-c1-t">isOldCryptCost lê o custo na posição errada do hash</strong><span class="loc">Corretude, linha 47</span><button type="button" class="linkish tog" aria-expanded="true">Recolher</button></div>
+          <div class="mf-b">
+            <p>O custo de um hash bcrypt fica nos caracteres 4 e 5 (<code>$2a$10$</code>), mas a função lê os caracteres 3 e 4, o <code>$</code> e o primeiro dígito. <code>Atoi</code> falha, a função devolve <code>false</code> para todo hash e nenhum hash antigo é regravado.</p>
+            <dl><dt>Direção sugerida</dt><dd>Use <code>bcrypt.Cost</code>, que já lê o custo do hash, em vez de recortar a string.</dd></dl>
+            <div class="mf-acts"><button type="button" class="aibtn">Criar rascunho de comentário</button><button type="button" class="linkish">Abrir no Insights</button></div>
+          </div>
+        </div>
+        <div class="ln add"><i></i><i>48</i><span class="lane"></span><span class="c"><span>	if err != nil {</span></span></div>
+        <div class="ln add"><i></i><i>49</i><span class="lane"></span><span class="c"><span>		return false</span></span></div>
+        <div class="ln add"><i></i><i>50</i><span class="lane"></span><span class="c"><span>	}</span></span></div>
+        <div class="ln add"><i></i><i>51</i><span class="lane"></span><span class="c"><span>	<span class="cm">// Hashes below the minimum cost get rewritten on the next login.</span></span></span></div>
+        <div class="ln add rng rs re"><i></i><i>52</i><span class="lane"></span><span class="c"><span>	return cost &lt; 12</span></span></div>
+        <div class="mf sig" id="mf-c2" data-open="false" role="group" aria-labelledby="mf-c2-t" tabindex="-1">
+          <div class="mf-h"><em class="t-ai">Modelo</em><em class="sev s-low"><svg class="bars" aria-hidden="true"><use href="#sev-1"/></svg>Baixa</em><strong id="mf-c2-t">Custo mínimo do bcrypt fixo no código, fora da configuração</strong><span class="loc">Configuração, linha 52</span><button type="button" class="linkish tog" aria-expanded="false">Mostrar</button></div>
+          <div class="mf-b">
+            <p>O 12 está escrito na função, mas o custo dos hashes novos vem de <code>config.BcryptCost</code>. Se a configuração subir, esta conta fica para trás.</p>
+            <dl><dt>Direção sugerida</dt><dd>Compare com <code>config.BcryptCost</code> em vez do número fixo.</dd></dl>
+            <div class="mf-acts"><button type="button" class="aibtn">Criar rascunho de comentário</button><button type="button" class="linkish">Abrir no Insights</button></div>
+          </div>
+        </div>
+        <div class="ln add"><i></i><i>53</i><span class="lane"></span><span class="c"><span>}</span></span></div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<template id="draft-tpl">
+  <div class="cmt draft" role="group" aria-label="Seu rascunho de comentário, linha 89" tabindex="-1">
+    <div class="who"><b>Você</b><span>agora</span><span class="tag">Rascunho</span><span class="from">a partir de um achado do modelo</span></div>
+    <div data-edit>
+      <label class="faint" for="draft-text" style="font-size:12px">Comentar nesta linha</label>
+      <textarea id="draft-text">Quando o bind no AD falha, o erro é descartado e o login segue para a senha local sem deixar rastro. Se o AD cair em produção, ninguém vai saber.
+
+Sugestão: registrar o erro com log.Warn (login e host do AD) antes do fallback, e contar os fallbacks numa métrica para alertar.</textarea>
+      <div class="acts"><button type="button" class="primary sm" data-act="save" style="color:var(--bg)">Salvar</button><button type="button" data-act="delete">Excluir rascunho</button></div>
+      <p class="note">Fica só no DiffLens até você clicar em Publicar comentários.</p>
+    </div>
+    <div data-view hidden>
+      <p data-text></p>
+      <div class="acts"><button type="button" data-act="edit">Editar</button><button type="button" data-act="delete">Excluir</button></div>
+    </div>
+  </div>
+</template>
+
+<!-- The draft made from a tool check: the same draft, flashed in ink instead of the AI colour. -->
+<template id="draft-ck-tpl">
+  <div class="cmt draft" role="group" aria-label="Seu rascunho de comentário, linha 96" tabindex="-1" style="--flash:var(--limit)">
+    <div class="who"><b>Você</b><span>agora</span><span class="tag">Rascunho</span><span class="from">a partir de uma checagem do staticcheck</span></div>
+    <div data-edit>
+      <label class="faint" for="draft-ck-text" style="font-size:12px">Comentar nesta linha</label>
+      <textarea id="draft-ck-text">O erro de rehashLater é atribuído a err e nunca lido (staticcheck SA4006). Se a regravação do hash falhar, ninguém fica sabendo.
+
+Sugestão: tratar o erro, ao menos com log.Warn, ou descartá-lo de forma explícita com _ =.</textarea>
+      <div class="acts"><button type="button" class="primary sm" data-act="save" style="color:var(--bg)">Salvar</button><button type="button" data-act="delete">Excluir rascunho</button></div>
+      <p class="note">Fica só no DiffLens até você clicar em Publicar comentários.</p>
+    </div>
+    <div data-view hidden>
+      <p data-text></p>
+      <div class="acts"><button type="button" data-act="edit">Editar</button><button type="button" data-act="delete">Excluir</button></div>
+    </div>
+  </div>
+</template>
+
+<!-- MOCKUP NOTES: outside the app frame -->
+<aside class="mnotes" id="notes" aria-label="Notas do mockup">
+  <section>
+    <h2>Uma só linguagem visual, nos três lugares: três tipos de sinal e uma ausência</h2>
+    <div class="col2">
+      <ul>
+        <li><b>Achado do modelo</b> (lido, não medido) = três barras crescentes, quantas cheias quanto a gravidade (3 alta, 2 média, 1 baixa), na cor da gravidade: <span class="s-high">rosa</span>, <span class="s-med">tangerina</span>, <span class="s-low">verde-água</span>. A quantidade de barras cheias já diz a gravidade sem a cor (daltonismo, caixa esmaecida). Etiqueta “Modelo”, fundo de IA no Diff.</li>
+        <li><b>Limite medido</b> = um medidor com o ponteiro no alto, em tinta (cor do texto), nunca numa cor. São três limites, os de <code>QualityLimits</code>: complexidade acima de 10, CRAP acima de 30 e, agora, <b>cobertura das linhas alteradas abaixo de 80%</b>, que conta como os outros dois (selo, popover, marcador do Diff, chips). O valor fora do limite vai no vermelho de “acima do limite” da aba Qualidade, só como texto. A cobertura diz “mínimo 80%”, não “limite”, porque o lado ruim é o de baixo.</li>
+        <li><b>Checagem de ferramenta</b> (<code>go vet</code>, <code>staticcheck</code>; medida, nas palavras da ferramenta) = uma chave inglesa, em tinta como o medidor. Em texto, o chip leva a ferramenta e a regra: “staticcheck SA4006”, “go vet printf”. A mensagem não é traduzida e vai marcada como inglês para o leitor de tela.</li>
+        <li><b>Sem teste</b> (uma ausência medida) = um frasco riscado, em tinta: nenhum teste executa a função alterada. É o caso extremo da cobertura abaixo do mínimo, então substitui o medidor de cobertura em vez de somar: a função não conta duas vezes.</li>
+        <li>Em texto (listas, popover, Diff) vem o chip com a marca e a palavra: “Alta”, “3 limites”, “staticcheck SA4006”, “sem teste”. Na caixa do Flow vem só a marca e o número.</li>
+      </ul>
+      <ul>
+        <li><b>Por que não colide com o Flow:</b> a cor do estado é uma barra vertical na borda esquerda (verde, âmbar, vermelho); o azul é seleção e conexão adicionada. O selo fica no canto inferior direito, atravessando a borda, com fundo próprio e outra forma. Os tons de gravidade foram puxados para longe: rosa em vez de vermelho, tangerina em vez de âmbar, verde-água em vez de azul.</li>
+        <li>O canto superior direito continua sendo da marca de revisão (✓ ou anel tracejado): veja <code>AuthService.bindAD</code>.</li>
+        <li>Achados descartados não contam em lugar nenhum: nem no selo, nem nas listas, nem no contador do Diff.</li>
+        <li><b>Ordem fixa.</b> No selo e no rótulo acessível: modelo, limites, checagens, sem teste (a parte colorida fica onde já estava). No popover, o medido vem antes do lido: limites (com sem teste), checagens, e só então o modelo.</li>
+        <li>Só a gravidade do modelo tem cor. Tudo o que é medido é tinta, para nada medido parecer uma opinião nem um estado da função.</li>
+      </ul>
+    </div>
+  </section>
+  <section data-sec="overview">
+    <h2>Visão geral</h2>
+    <ol>
+      <li><b>“Onde olhar primeiro” continua um ranking único</b>, no máximo 5, que mistura achados não descartados com o que foi medido, e ganha as marcas novas: o chip de gravidade ao lado de “Modelo”; o medidor e o chip da ferramenta ao lado de “Medido”.</li>
+      <li><b>Ranking escolhido</b> (menor primeiro): achado alto 0 · teste falhando 1 · <b>checagem de correção</b> (<code>go vet</code>, <code>staticcheck</code> SA) 2 · limite 3 · achado médio 4 · sem teste 5 · achado baixo 6 · <b>checagem de estilo</b> (<code>staticcheck</code> S, ST, QF) 7. Uma checagem de correção é quase sempre um defeito de verdade e não depende do modelo, por isso vem logo depois do teste falhando e antes dos limites; uma de estilo vale menos que tudo. Muda o código atual em um ponto: limite passa de 2 para 3, e média de 3 para 4.</li>
+      <li><b>Uma linha por função para o que foi medido</b>: limites, checagens e sem teste de uma mesma função viram uma linha só, na posição da parte mais urgente. O código já faz isso com “sem cobertura”, que não aparece de novo numa função acima de um limite. Aqui <code>authenticate</code> sobe com o SA4006 e leva os 3 limites junto (chip “3 limites”, com a cobertura). Por isso <code>LockoutTracker.register</code> (1 limite) e <code>isOldCryptCost</code> (sem teste) ficam abaixo do corte de 5; aparecem nas contagens de “Medido nesta branch”. O ST1005 de <code>bindAD</code> é de estilo e fica lá embaixo.</li>
+      <li>O título de uma linha de checagem é genérico (“go vet aponta um problema em Client.Bind”) e o detalhe é a mensagem da ferramenta, sem tradução: o DiffLens não interpreta a regra.</li>
+      <li>“Medido nesta branch” ganha as contagens: funções acima de um limite (agora qualquer um dos três), funções alteradas que nenhum teste executa, e checagens estáticas por ferramenta.</li>
+      <li><b>“O modelo sugere mudar” continua a lista, sem repetir</b>: fica logo abaixo e mostra só os achados que não couberam em “Onde olhar primeiro”, por gravidade, no máximo 5. O subtítulo diz quantos sobraram (“6 além dos 2 acima”), e o rodapé leva ao Insights quando sobra mais.</li>
+      <li>Se todos os achados já couberam acima, ou se não há achado, a seção some inteira: nada de título com “nenhum”. Veja “Sem achados nem limites”: nele também não há checagem nem função sem teste, então “Onde olhar primeiro” fica só com o teste falhando, o selo, a legenda, os dois controles do Diff e as seções do popover somem, e “Medido nesta branch” diz zero.</li>
+      <li>Limites e checagens não entram na lista nova: são medidos, e já estão em “Onde olhar primeiro” e em “Medido nesta branch”.</li>
+      <li><b>Decisão a confirmar:</b> a lista nova abre no Diff, na linha (como pedido), mas um achado em “Onde olhar primeiro” abre no Flow quando uma função contém a linha (como o app faz hoje). Dá para alinhar as duas, para o Diff, sem perder nada: o Flow já tem o selo.</li>
+    </ol>
+  </section>
+  <section data-sec="flow" hidden>
+    <h2>Flow</h2>
+    <ol>
+      <li>A caixa não muda de cor, de borda nem de tamanho: o selo é sobreposto, então o layout do ELK não muda.</li>
+      <li><b>O selo tem até quatro partes, sempre nesta ordem, separadas por um fio</b>: achados do modelo (marca do mais grave e o total, quando é mais de um), limites (medidor e quantos), checagens (chave e quantas) e sem teste (frasco riscado, sem número numa função). Parte vazia não aparece, então o selo comum tem uma ou duas. Numa caixa de 200px as quatro cabem; na prática uma função sem teste raramente tem também limite de cobertura, porque o frasco o substitui.</li>
+      <li>Exemplos: <code>AuthService.authenticate</code> tem as três de sinal: 4 achados (o mais grave alto), 3 limites (CC, CRAP e cobertura 48%) e 1 checagem. <code>AuthService.bindAD</code> tem só uma checagem (staticcheck ST1005): a chave sozinha, com o ✓ de revisada no outro canto. <code>isOldCryptCost</code>: 2 achados e o frasco. <code>LockoutTracker.register</code>: 1 médio e 1 limite, sem números.</li>
+      <li>Pacote ou arquivo fechado agrega as funções dele: o mais grave entre elas e a soma de cada parte, e o frasco com o número de funções sem teste, quando é mais de uma (<code>ldap_client</code>: o achado baixo de <code>client.go</code> e o go vet de <code>bind.go</code>). Um grupo aberto não repete no cabeçalho o que as caixas de dentro já mostram.</li>
+      <li>O leitor de tela ouve o selo no rótulo da caixa, na mesma ordem: “4 achados do modelo, o mais grave de gravidade alta, 3 limites ultrapassados, 1 achado de checagem estática”; “nenhum teste a executa”. O selo em si é <code>aria-hidden</code>.</li>
+      <li>No popover, a seção “Limites de qualidade” só aparece quando a função passa de algum limite ou nenhum teste a executa; então a complexidade sai dos fatos de cima e vem para cá, sem aparecer duas vezes. A cobertura agora é um limite como os outros: medidor e valor em vermelho quando fica abaixo de 80%. Sem teste, a linha vira “Nenhum teste executa esta função”, com o frasco e 0% (popover de <code>isOldCryptCost</code>).</li>
+      <li>“Checagens estáticas” vem entre os limites e o modelo, só quando há achado de ferramenta na função: chip da ferramenta e da regra, a mensagem dela (que leva à linha no Diff), a linha e o link para Qualidade. “Achados do modelo” só aparece quando há achado. Cada título leva à linha no Diff.</li>
+      <li>Com a coluna de explicação aberta (popover de 760px), as duas seções ficam na coluna da esquerda, no mesmo lugar.</li>
+      <li>A legenda ganha o grupo “Achados, limites e checagens” ao lado de “Marcas de revisão”, com as quatro marcas, e só quando alguma caixa tem selo.</li>
+    </ol>
+  </section>
+  <section data-sec="diff" hidden>
+    <h2>Diff</h2>
+    <ol>
+      <li><b>Limite:</b> na linha em que a função começa, um medidor na faixa entre os números e o código, e um marcador discreto no fim da linha, “CC 14 · CRAP 42 · cobertura 48%”: só os limites ultrapassados entram nele. A dica (title) dá os limites; o clique abre o detalhe sob a linha, com o caminho para Qualidade.</li>
+      <li><b>Sem teste:</b> na mesma linha e no mesmo lugar do marcador de limite, uma nota tracejada “Nenhum teste executa esta função”, com o frasco também na faixa (<code>crypt.go</code>, linha 44). Ela não abre nada: o detalhe é a dica. Se a função também passa de um limite, a nota vem logo depois do marcador.</li>
+      <li><b>Checagem:</b> a chave na faixa da linha citada, e logo abaixo uma linha só, com a borda esquerda em tinta e sem o fundo de IA: chip “staticcheck SA4006”, a mensagem da ferramenta, a linha e “Criar rascunho de comentário”, que se comporta como o do achado (vira “Ver rascunho”; excluir o rascunho devolve o botão). Não tem recolher: já tem uma linha.</li>
+      <li><b>Decisão: dois controles, não um.</b> “Mostrar achados do modelo” continua só do modelo, e “Mostrar checagens” é outro, em tinta, cada um só quando há o que esconder. Um único “Mostrar achados” juntaria o que foi lido com o que foi medido, e quem desliga o modelo por não confiar nele perderia o que a ferramenta mediu. Os marcadores de limite e a nota de sem teste não têm controle: ocupam uma linha e são medidos.</li>
+      <li><b>Achado:</b> as linhas citadas ganham uma barra fina da cor de IA na mesma faixa, e o bloco fica sob a última linha citada, no tamanho do cartão de comentário, com o fundo de IA e a etiqueta “Modelo”. Dá para recolher cada um numa linha; um achado descartado já vem recolhido, como um comentário resolvido.</li>
+      <li><b>“Criar rascunho de comentário”</b> cria um rascunho seu, na mesma linha, já aberto para editar, com o texto escrito como revisor (sem “o modelo diz”). Ele é um rascunho como os outros: conta em “Publicar comentários” e só sai com ele. O botão vira “Ver rascunho”. Excluir o rascunho devolve o botão.</li>
+      <li><b>“Mostrar achados do modelo”</b> esconde os blocos e as barras do arquivo inteiro; os marcadores de limite ficam, porque são medidos e ocupam uma linha. Rascunhos criados a partir de achados também ficam: já são comentários seus. O controle só existe quando a revisão tem achados.</li>
+      <li>O cabeçalho do arquivo resume tudo: “4 achados” (pelo mais grave), “3 limites”, “1 checagem”; e, em <code>crypt.go</code>, “1 função sem teste”.</li>
+    </ol>
+  </section>
+  <section>
+    <h2>Fora deste mockup</h2>
+    <ul>
+      <li>Marcas na lista de arquivos do Diff e na barra lateral do Flow (pontos de entrada, pacotes): seria o mesmo selo; não foram pedidas.</li>
+      <li>A aba Insights ainda pinta a gravidade com vermelho, âmbar e cinza. Para a linguagem ser uma só, ela passaria a usar o mesmo chip com barras.</li>
+      <li>O botão Explicar das caixas do Flow e o modo lado a lado do Diff não foram desenhados; nada aqui muda neles.</li>
+      <li>Achados cuja linha não foi encontrada (“Local não encontrado”) não têm linha no Diff: ficam só no popover e nas listas, sem o link para o Diff.</li>
+      <li>Checagens numa linha fora de qualquer função alterada contam no arquivo e no pacote, não numa caixa; checagens em linhas não alteradas não entram em nada além da aba Qualidade.</li>
+      <li>A aba Qualidade marca cada achado de checagem com a borda vermelha de “problema”. Para a linguagem ser uma só, ela passaria à borda em tinta com a chave e o chip da ferramenta.</li>
+      <li><code>bind.go</code> (go vet) e <code>ad.go</code> (ST1005) não foram desenhados no Diff: seria a mesma linha de checagem de <code>auth_service.go</code>.</li>
+    </ul>
+  </section>
+</aside>
+
+<script>
+  const $ = (s, root = document) => root.querySelector(s);
+  const $$ = (s, root = document) => [...root.querySelectorAll(s)];
+  const body = document.body;
+
+  // Accessible names of the boxes, with and without their badge.
+  $$("[data-label-clean]").forEach((el) => { el.dataset.labelSig = el.getAttribute("aria-label"); });
+
+  function setSection(section) {
+    body.dataset.section = section;
+    $$("[data-sec]").forEach((el) => { el.hidden = el.dataset.sec !== section; });
+    $$("[data-set-section]").forEach((b) => {
+      b.setAttribute(b.getAttribute("role") === "tab" ? "aria-selected" : "aria-pressed", String(b.dataset.setSection === section));
+    });
+  }
+  function setVariant(variant) {
+    body.dataset.variant = variant;
+    $$("[data-set-variant]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.setVariant === variant)));
+    $$("[data-label-clean]").forEach((el) => {
+      el.setAttribute("aria-label", variant === "clean" ? el.dataset.labelClean : el.dataset.labelSig);
+    });
+  }
+
+  // ---------- Flow popovers: one open at a time, by id; null closes ----------
+  const popToggle = $("#pop-toggle");
+  const popBtn = (id) => $(`[data-pop="${id}"]`);
+  const openPop = () => $$(".pop").find((p) => !p.hidden)?.id ?? null;
+  let lastPop = "pop-auth";
+  function setPopover(id) {
+    $$(".pop").forEach((p) => { p.hidden = p.id !== id; });
+    $$("[data-pop]").forEach((b) => {
+      b.setAttribute("aria-expanded", String(b.dataset.pop === id));
+      b.closest(".fn").classList.toggle("sel", b.dataset.pop === id);
+    });
+    if (id) lastPop = id;
+    popToggle.textContent = id ? "Fechar o popover" : "Abrir o popover";
+  }
+
+  // ---------- Diff ----------
+  const pubN = $("#pub-n");
+  function goTo(id) {
+    setSection("diff");
+    setPopover(null);
+    const target = $("#" + id);
+    if (!target) return;
+    // Jumping to a hidden kind of block turns its toggle back on.
+    const hides = target.matches(".mf") ? "no-findings" : target.matches(".ck") ? "no-checks" : null;
+    if (hides) { $(`[data-hides="${hides}"]`).checked = true; body.classList.remove(hides); }
+    if (target.dataset.open === "false") toggleFinding(target);
+    target.scrollIntoView({ block: target.matches(".dfile") ? "start" : "center" });
+    target.focus({ preventScroll: true });
+  }
+  function toggleFinding(card) {
+    const open = card.dataset.open !== "true";
+    card.dataset.open = String(open);
+    const tog = $(".tog", card);
+    tog.setAttribute("aria-expanded", String(open));
+    tog.textContent = open ? "Recolher" : "Mostrar";
+  }
+  function flash(el) {
+    el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 1600);
+  }
+  // A draft made from a finding or a check: created once in its slot, then the button only shows it.
+  const countDrafts = () => { pubN.textContent = String(1 + $$(".cmt.draft").length); };
+  function createOrShowDraft(btn) {
+    const slot = $("#" + btn.dataset.slot), draft = $(".draft", slot);
+    if (!draft) {
+      slot.append($("#" + btn.dataset.tpl).content.cloneNode(true));
+      btn.textContent = "Ver rascunho";
+      btn.classList.add("made");
+      countDrafts();
+      return $("textarea", slot).focus();
+    }
+    draft.scrollIntoView({ block: "center" });
+    draft.focus({ preventScroll: true });
+    flash(draft);
+  }
+  function draftAction(draft, act) {
+    const edit = $("[data-edit]", draft), view = $("[data-view]", draft), text = $("textarea", draft);
+    if (act === "save") {
+      $("[data-text]", view).textContent = text.value;
+      edit.hidden = true; view.hidden = false;
+      $("[data-act=edit]", view).focus();
+    } else if (act === "edit") {
+      edit.hidden = false; view.hidden = true;
+      text.focus();
+    } else if (act === "delete") {
+      const btn = $(`[data-slot="${draft.parentElement.id}"]`);
+      draft.remove();
+      countDrafts();
+      btn.textContent = "Criar rascunho de comentário";
+      btn.classList.remove("made");
+      btn.focus();
+    }
+  }
+
+  document.addEventListener("click", (event) => {
+    const t = event.target;
+    const sec = t.closest("[data-set-section]");
+    if (sec) return setSection(sec.dataset.setSection);
+    const variant = t.closest("[data-set-variant]");
+    if (variant) return setVariant(variant.dataset.setVariant);
+    const go = t.closest("[data-goto]");
+    if (go) {
+      const where = go.dataset.goto;
+      // "flow" opens authenticate's popover; "flow:pop-crypt" another popover; "flow:n-ldap" focuses a box.
+      if (where.startsWith("flow")) {
+        const id = where.split(":")[1] ?? "pop-auth";
+        setSection("flow");
+        if (id.startsWith("pop")) { setPopover(id); return popBtn(id).focus(); }
+        setPopover(null);
+        return $(`#${id} .box`).focus();
+      }
+      if (where === "diff") { setSection("diff"); return $("#dmain").scrollTo({ top: 0 }); }
+      return goTo(where);
+    }
+    const nodeBtn = t.closest("[data-pop]");
+    if (nodeBtn) return setPopover(openPop() === nodeBtn.dataset.pop ? null : nodeBtn.dataset.pop);
+    if (t.closest("#pop-toggle")) return setPopover(openPop() ? null : lastPop);
+    const x = t.closest(".pop .x");
+    if (x) { const id = x.closest(".pop").id; setPopover(null); return popBtn(id).focus(); }
+    const tog = t.closest(".mf .tog");
+    if (tog) return toggleFinding(tog.closest(".mf"));
+    if (t.closest("#lim-btn")) {
+      const btn = $("#lim-btn"), open = btn.getAttribute("aria-expanded") !== "true";
+      btn.setAttribute("aria-expanded", String(open));
+      $("#lim-panel").hidden = !open;
+      return;
+    }
+    const mkd = t.closest(".mkd");
+    if (mkd) return createOrShowDraft(mkd);
+    const act = t.closest(".draft [data-act]");
+    if (act) return draftAction(act.closest(".draft"), act.dataset.act);
+  });
+
+  // "Mostrar achados do modelo" and "Mostrar checagens": each hides its own kind of block.
+  $$("[data-hides]").forEach((box) => box.addEventListener("change", () => body.classList.toggle(box.dataset.hides, !box.checked)));
+
+  document.addEventListener("keydown", (event) => {
+    const id = openPop();
+    if (event.key === "Escape" && body.dataset.section === "flow" && id) { setPopover(null); popBtn(id).focus(); }
+  });
+
+  $("#theme").addEventListener("click", (event) => {
+    const root = document.documentElement, dark = root.dataset.theme === "dark";
+    root.dataset.theme = dark ? "light" : "dark";
+    event.currentTarget.textContent = dark ? "Tema escuro" : "Tema claro";
+  });
+
+  setSection("overview");
+  setVariant("signals");
+</script>
+</body>
+</html>

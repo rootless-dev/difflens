@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiffLens, aba Testes (mockup)</title>
+<style>
+  /* Tokens of design/prototype.html, unchanged. */
+  :root[data-theme="dark"] {
+    --bg:#151925; --panel:#1a1f2e; --raised:#232a3d; --line:#2c344c; --text:#e7e9f2; --muted:#8d96ae; --faint:#5c6580;
+    --accent:#7ea6ff; --accent-soft:rgba(126,166,255,.14);
+    --add:#56cf97; --del:#f27d72; --mod:#e9b85c; --ai:#d992e0;
+    --add-bg:rgba(86,207,151,.11); --del-bg:rgba(242,125,114,.11); --mod-bg:rgba(233,184,92,.10); --ai-bg:rgba(217,146,224,.09);
+    --syn-kw:#d992e0; --syn-str:#7cc7d8; --syn-type:#7ea6ff;
+    color-scheme:dark;
+  }
+  :root[data-theme="light"] {
+    --bg:#eceff5; --panel:#f7f8fb; --raised:#ffffff; --line:#d8ddea; --text:#1b2132; --muted:#5d6780; --faint:#98a1b7;
+    --accent:#2f5fd8; --accent-soft:rgba(47,95,216,.10);
+    --add:#12855a; --del:#c8402f; --mod:#a06c08; --ai:#9b3fa8;
+    --add-bg:rgba(18,133,90,.10); --del-bg:rgba(200,64,47,.09); --mod-bg:rgba(160,108,8,.09); --ai-bg:rgba(155,63,168,.07);
+    --syn-kw:#9b3fa8; --syn-str:#1f7891; --syn-type:#2f5fd8;
+    color-scheme:light;
+  }
+  * { box-sizing:border-box; margin:0; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  body { font:13px/1.45 "IBM Plex Sans", system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  code, .mono, pre { font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:12px; }
+  button, input { font:inherit; color:inherit; }
+  button { background:none; border:0; cursor:pointer; padding:0; text-align:left; }
+  button:disabled { cursor:default; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+  [hidden] { display:none !important; }
+
+  /* ---------- mockup controls: not part of the app ---------- */
+  .mock { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:8px 16px; background:repeating-linear-gradient(135deg, var(--bg) 0 10px, var(--panel) 10px 20px); border-bottom:2px dashed var(--faint); font-size:12px; }
+  .mock strong { font-weight:600; color:var(--muted); }
+  .mock .seg { display:inline-flex; padding:2px; border-radius:7px; background:var(--panel); border:1px solid var(--line); }
+  .mock .seg button { padding:3px 10px; border-radius:5px; color:var(--muted); }
+  .mock .seg button[aria-pressed="true"] { background:var(--raised); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  .mock .note { color:var(--faint); margin-left:auto; }
+
+  /* ---------- app chrome, static ---------- */
+  .app { min-height:calc(100vh - 44px); display:flex; flex-direction:column; }
+  .bar { display:flex; align-items:center; gap:14px; height:46px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .logo { display:flex; align-items:center; gap:8px; font-weight:600; letter-spacing:-.01em; }
+  .crumb { display:flex; align-items:center; gap:8px; color:var(--muted); }
+  .crumb .c { padding:4px 8px; border-radius:6px; color:var(--text); font-weight:500; }
+  .compare { display:flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--raised); }
+  .compare .into { color:var(--faint); }
+  .stat { color:var(--muted); } .stat .a { color:var(--add); } .stat .d { color:var(--del); }
+  .spacer { flex:1; }
+  .ext { display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border:1px solid var(--line); border-radius:6px; color:var(--text); text-decoration:none; font-size:12px; white-space:nowrap; }
+  .analysis { display:flex; align-items:center; gap:8px; padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .analysis i { width:8px; height:8px; border-radius:50%; background:var(--add); }
+  .ghost { padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); }
+  .tabs { display:flex; gap:4px; padding:0 12px; background:var(--panel); border-bottom:1px solid var(--line); }
+  .tab { padding:10px 12px 9px; color:var(--muted); border-bottom:2px solid transparent; font-weight:500; }
+  .tab[aria-selected="true"] { color:var(--text); border-color:var(--accent); }
+  .count { margin-left:6px; padding:0 6px; border-radius:9px; font-size:11px; background:var(--del-bg); color:var(--del); }
+  .count.ai { background:var(--ai-bg); color:var(--ai); }
+
+  /* ---------- page: same width and padding as ReviewPage ---------- */
+  .page { flex:1; padding:28px max(28px, calc(50% - 600px)) 64px; }
+  h2.sect { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:500; color:var(--muted); margin:30px 0 10px; }
+  h2.sect .n { color:var(--faint); font-weight:400; }
+  .hint { color:var(--faint); font-size:12px; margin-top:8px; }
+  p.prose { max-width:68ch; }
+
+  /* buttons, as in the app */
+  .primary { padding:7px 14px; border-radius:7px; background:var(--accent); color:var(--bg); font-weight:500; white-space:nowrap; }
+  .primary:hover:not(:disabled) { filter:brightness(1.08); }
+  .secondary { padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:var(--raised); white-space:nowrap; }
+  .secondary:hover:not(:disabled) { border-color:var(--faint); }
+  .sm { padding:4px 10px; font-size:12px; border-radius:6px; }
+  .linkish { color:var(--accent); font-size:12px; } .linkish:hover { text-decoration:underline; }
+  .primary:disabled, .secondary:disabled { opacity:.45; }
+  .split { display:inline-flex; }
+  .split .primary:first-child { border-radius:7px 0 0 7px; }
+  .split .primary.caret { border-radius:0 7px 7px 0; padding:7px 9px; margin-left:1px; }
+  .chev { display:inline-flex; width:14px; height:14px; align-items:center; justify-content:center; flex:none; color:var(--faint); }
+  .chev::before { content:""; width:5px; height:5px; border:solid currentColor; border-width:0 1.5px 1.5px 0; transform:rotate(-45deg); transition:transform .12s; }
+  [aria-expanded="true"] > .chev::before, [aria-expanded="true"].chev::before { transform:rotate(45deg) translate(-1px,-1px); }
+  .caret .chev { color:inherit; } .caret .chev::before { transform:rotate(45deg) translate(-1px,-1px); }
+
+  /* outcome marks */
+  .o { display:inline-flex; width:14px; justify-content:center; font-size:12px; flex:none; }
+  .o.pass { color:var(--add); } .o.fail { color:var(--del); } .o.skip { color:var(--faint); }
+  em.tag { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; white-space:nowrap; }
+  em.tag.new { background:var(--add-bg); color:var(--add); } em.tag.mod { background:var(--mod-bg); color:var(--mod); }
+  em.t-ai { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; background:var(--ai-bg); color:var(--ai); }
+  .loc { font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--accent); } button.loc:hover { text-decoration:underline; }
+  .loc.off { color:var(--muted); cursor:default; } button.loc.off:hover { text-decoration:none; }
+
+  .spin { display:inline-block; width:12px; height:12px; border:1.6px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; flex:none; }
+  .spin.ai { border-top-color:var(--ai); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration:3s; } .chev::before { transition:none; } }
+
+  /* ---------- verdict ---------- */
+  .verdict { display:grid; grid-template-columns:auto 1fr auto; gap:4px 14px; align-items:start; padding-bottom:16px; border-bottom:1px solid var(--line); }
+  .vmark { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:15px; font-weight:600; margin-top:1px; }
+  .verdict.fail .vmark { background:var(--del-bg); color:var(--del); }
+  .verdict.pass .vmark { background:var(--add-bg); color:var(--add); }
+  .verdict h1 { font-size:18px; font-weight:600; letter-spacing:-.01em; line-height:1.3; }
+  .verdict.fail h1 { color:var(--del); }
+  .verdict .vsub { color:var(--muted); margin-top:2px; }
+  .vacts { display:flex; gap:8px; align-items:center; position:relative; }
+  .facts { grid-column:2 / -1; display:flex; flex-wrap:wrap; gap:4px 18px; margin-top:10px; color:var(--muted); font-size:12px; list-style:none; padding:0; }
+  .facts b { font-weight:500; color:var(--text); font-family:"IBM Plex Mono", monospace; font-size:12px; }
+  .facts b.bad { color:var(--del); }
+  .facts .iso { color:var(--faint); }
+  .facts button { display:inline-flex; align-items:center; gap:4px; color:var(--muted); }
+  .facts button:hover { color:var(--text); }
+  .covpanel { grid-column:2 / -1; margin-top:12px; max-width:560px; padding:12px 14px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+  .covs { list-style:none; padding:0; display:grid; grid-template-columns:auto 1fr 40px; gap:8px 12px; align-items:center; }
+  .covs li { display:contents; }
+  .covs span { text-align:right; font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--muted); }
+  .cbar { height:5px; border-radius:3px; background:var(--line); overflow:hidden; }
+  .cbar i { display:block; height:100%; background:var(--add); } .cbar.mid i { background:var(--mod); }
+
+  /* run options menu */
+  .menu { position:absolute; top:calc(100% + 6px); right:0; z-index:10; width:320px; padding:6px; background:var(--panel); border:1px solid var(--line); border-radius:9px; box-shadow:0 18px 50px rgba(0,0,0,.35); }
+  .menu .mh { padding:6px 8px 4px; font-size:12px; color:var(--faint); }
+  .menu [role^="menuitem"] { display:grid; grid-template-columns:16px 1fr; gap:2px 8px; width:100%; padding:6px 8px; border-radius:6px; }
+  .menu [role^="menuitem"]:hover { background:var(--raised); }
+  .menu [role^="menuitem"] .ck { color:var(--accent); font-size:12px; }
+  .menu [role^="menuitem"] small { grid-column:2; color:var(--muted); font-size:12px; }
+  .menu [role^="menuitem"] .last { color:var(--faint); font-weight:400; }
+  .menu hr { border:0; border-top:1px solid var(--line); margin:6px 2px; }
+
+  /* ---------- running the whole suite ---------- */
+  .runbox { padding-bottom:16px; border-bottom:1px solid var(--line); }
+  .runhead { display:flex; align-items:center; gap:12px; }
+  .runhead h1 { font-size:18px; font-weight:600; letter-spacing:-.01em; }
+  .runhead .spin { width:16px; height:16px; }
+  .runhead .el { font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--muted); }
+  .runhead .secondary { margin-left:auto; }
+  .prog { margin:14px 0 8px; height:6px; border-radius:3px; background:var(--line); overflow:hidden; max-width:720px; }
+  .prog i { display:block; height:100%; width:29%; background:var(--accent); }
+  .runfacts { display:flex; flex-wrap:wrap; gap:4px 18px; color:var(--muted); font-size:12px; }
+  .runfacts b { font-weight:500; color:var(--text); font-family:"IBM Plex Mono", monospace; }
+  .prevnote { display:flex; align-items:center; gap:10px; margin-top:22px; color:var(--muted); font-size:12px; }
+  .prevnote em { font-style:normal; font-size:11px; padding:0 8px; border-radius:9px; border:1px dashed var(--faint); color:var(--muted); }
+  body[data-state="run-all"] .previous { opacity:.5; filter:saturate(.6); }
+  body[data-state="run-all"] .previous button:not(.keep) { pointer-events:none; }
+
+  /* ---------- failure cards ---------- */
+  .fails { display:grid; gap:12px; }
+  .fcard { border:1px solid var(--line); border-left:2px solid var(--del); border-radius:10px; background:var(--panel); }
+  .fhead { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; gap:2px 14px; align-items:center; padding:12px 16px 10px 10px; }
+  .fhead > .selbox { margin-right:-8px; }
+  .ftoggle { display:flex; align-items:center; gap:8px; min-width:0; padding:2px 4px; border-radius:6px; }
+  .ftoggle code { font-size:13.5px; font-weight:500; color:var(--text); overflow-wrap:anywhere; }
+  .kind { font-style:normal; font-size:11px; padding:1px 9px; border-radius:9px; background:var(--del-bg); color:var(--del); white-space:nowrap; }
+  .fdur { font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--faint); text-align:right; min-width:52px; }
+  .fmeta { grid-column:1 / -1; display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; padding-left:72px; color:var(--muted); font-size:12px; }
+  .fmeta code { color:var(--muted); }
+  .fbody { padding:0 16px 14px 72px; }
+  .fbody > * + * { margin-top:12px; }
+
+  .subs { list-style:none; padding:0 0 0 12px; border-left:1px solid var(--line); margin-top:4px; }
+  .sub { display:grid; grid-template-columns:14px 14px minmax(0,1fr) auto 52px; gap:8px; align-items:center; padding:3px 8px; border-radius:6px; }
+  .sub:hover, .sub:focus-within { background:var(--raised); }
+  .sub .nm { overflow-wrap:anywhere; } .sub .nm.passing { color:var(--muted); }
+  .sub small { font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--faint); text-align:right; }
+  .rowrun { font-size:12px; color:var(--accent); padding:1px 6px; border-radius:5px; opacity:0; }
+  .rowrun:focus-visible, .sub:hover .rowrun, .trow:hover .rowrun, .trow:focus-within .rowrun { opacity:1; }
+  .rowrun:hover { background:var(--accent-soft); }
+
+  /* excerpts */
+  .excerpt { border:1px solid var(--line); border-radius:8px; background:var(--bg); padding:10px 12px; max-width:920px; }
+  .excerpt .eh { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; color:var(--muted); font-size:12px; }
+  .excerpt .eh strong { font-weight:500; color:var(--text); font-size:13px; }
+  .race { display:grid; grid-template-columns:72px auto minmax(0,1fr); gap:0 16px; }
+  .race > div { display:contents; }
+  .race > div > * { padding:7px 0; border-top:1px solid var(--line); }
+  .race > div:first-child > * { border-top:0; padding-top:2px; }
+  .race .verb { font-weight:500; }
+  .race .verb.w { color:var(--del); } .race .verb.r { color:var(--mod); }
+  .race .who { color:var(--muted); }
+  .race .who code { color:var(--text); }
+  .assert { display:grid; grid-template-columns:72px minmax(0,1fr); gap:5px 16px; font-family:"IBM Plex Mono", monospace; font-size:12px; }
+  .assert dt { font-family:"IBM Plex Sans", sans-serif; font-size:13px; color:var(--muted); }
+  .assert dd.exp { color:var(--add); } .assert dd.got { color:var(--del); }
+  .compile { font:12px/1.7 "IBM Plex Mono", monospace; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .compile .hl { background:var(--del-bg); margin:0 -12px; padding:0 12px; display:block; }
+
+  .factions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+  .factions .sep { flex:1; }
+  .aibtn { padding:4px 10px; font-size:12px; border-radius:6px; border:1px solid color-mix(in srgb, var(--ai) 45%, transparent); background:var(--ai-bg); color:var(--ai); white-space:nowrap; font-weight:500; }
+  .aibtn:hover { border-color:var(--ai); }
+  .disabledwhy { color:var(--faint); font-size:12px; }
+  .outtoggle { display:inline-flex; align-items:center; gap:4px; color:var(--muted); font-size:12px; padding:4px 6px; border-radius:6px; }
+  .outtoggle:hover { color:var(--text); }
+  pre.out { max-height:320px; overflow:auto; border:1px solid var(--line); border-radius:7px; background:var(--bg); padding:8px 0; font-size:12px; line-height:1.7; }
+  pre.out span { display:block; padding:0 12px; white-space:pre; }
+  pre.out .hl { background:var(--del-bg); }
+
+  /* single test running inline */
+  .inlinerun { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:7px; background:var(--accent-soft); color:var(--text); font-size:12px; max-width:920px; }
+  .inlinerun .el { font-family:"IBM Plex Mono", monospace; color:var(--muted); }
+  .inlinerun .secondary { margin-left:auto; }
+  body[data-state="run-one"] #f1 .fresult { opacity:.5; }
+
+  /* ---------- explanation, written by a model ---------- */
+  .explain { border-radius:8px; background:var(--ai-bg); border-left:2px solid var(--ai); padding:12px 14px; max-width:920px; }
+  .explain header { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .explain header strong { font-weight:500; }
+  .explain .by { margin-left:auto; color:var(--faint); font-size:12px; }
+  .origin { font-style:normal; font-size:11px; padding:0 8px; border-radius:9px; border:1px solid var(--line); color:var(--text); background:var(--panel); }
+  .origin b { font-weight:400; color:var(--muted); }
+  .exgrid { display:grid; grid-template-columns:120px minmax(0,1fr); gap:10px 16px; }
+  .exgrid dt { color:var(--muted); }
+  .exgrid dd { max-width:76ch; }
+  .exgrid dd code { font-size:12px; }
+  .snippet { margin-top:6px; font:12px/1.65 "IBM Plex Mono", monospace; white-space:pre; overflow:auto; background:var(--bg); border:1px solid var(--line); border-radius:7px; padding:8px 0; }
+  .snippet span { display:block; padding:0 12px; }
+  .snippet .add { background:var(--add-bg); } .snippet .add::before { content:"+ "; color:var(--add); }
+  .snippet .ctx::before { content:"  "; }
+  .snippet .c { color:var(--faint); } .snippet .k { color:var(--syn-kw); } .snippet .ty { color:var(--syn-type); }
+  .exacts { display:flex; align-items:center; gap:12px; margin-top:12px; }
+  .loading { display:grid; gap:8px; }
+  .loading .lh { display:flex; align-items:center; gap:10px; color:var(--muted); }
+  .loading .lh button { margin-left:auto; }
+  .sk { height:10px; border-radius:4px; background:color-mix(in srgb, var(--ai) 14%, transparent); }
+
+  /* ---------- the whole suite browser ---------- */
+  .browser { margin-top:30px; border-top:1px solid var(--line); }
+  .btoggle { display:flex; align-items:center; gap:10px; width:100%; padding:12px 8px; border-radius:6px; }
+  .btoggle:hover { background:var(--panel); }
+  .btoggle strong { font-weight:500; }
+  .btoggle span { color:var(--muted); }
+  .btoggle .bad { color:var(--del); } .btoggle .ok { color:var(--add); }
+  .bbody { padding:4px 0 0; }
+  .btools { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; padding:0 8px; }
+  .search { width:300px; padding:5px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); }
+  .search::placeholder { color:var(--faint); }
+  .fchip { padding:3px 10px; border-radius:12px; border:1px solid var(--line); color:var(--muted); font-size:12px; }
+  .fchip:hover { color:var(--text); }
+  .fchip[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); color:var(--text); }
+  .fchip b { font-weight:500; font-family:"IBM Plex Mono", monospace; margin-left:4px; }
+  .btools .hint { margin:0 0 0 auto; }
+  .tree, .tree ul { list-style:none; padding:0; }
+  .tree ul { margin-left:22px; border-left:1px solid var(--line); padding-left:4px; }
+  .tree > li { border-top:1px solid var(--line); }
+  .tree > li:first-child { border-top:0; }
+  .trow { display:grid; grid-template-columns:16px 18px 16px minmax(0,1fr) auto 150px 64px 84px; gap:8px; align-items:center; min-height:32px; padding:3px 8px; border-radius:6px; }
+  .trow:hover, .trow:focus-within { background:var(--panel); }
+  .trow .tog { width:18px; height:18px; display:grid; place-items:center; border-radius:4px; }
+  .trow .nm { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .trow.pkg .nm code { font-size:12.5px; font-weight:500; color:var(--text); }
+  .trow .nm.passing { color:var(--muted); }
+  .trow .mk { display:flex; gap:6px; }
+  .trow .cnt { font-size:12px; color:var(--faint); text-align:right; white-space:nowrap; }
+  .trow .cnt .bad { color:var(--del); }
+  .trow .du { font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--faint); text-align:right; }
+  .trow .rowrun { justify-self:end; }
+  .trow.sub2 .nm { color:var(--muted); }
+  .trow.sub2 .nm.f { color:var(--text); }
+  .more { display:block; width:100%; padding:7px 8px 7px 74px; color:var(--muted); font-size:12px; border-radius:6px; }
+  .more:hover { color:var(--text); background:var(--panel); }
+
+  /* ---------- multi-selection ---------- */
+  .selbox { width:14px; height:14px; margin:0; accent-color:var(--accent); cursor:pointer; }
+  .selbox:disabled { cursor:default; opacity:.5; }
+  .trow:has(> .selbox:checked), .sub:has(> .selbox:checked) { background:var(--accent-soft); }
+  .secthead { display:flex; align-items:baseline; gap:14px; margin:30px 0 10px; }
+  .secthead h2.sect { margin:0; }
+  .linkish:disabled { opacity:.45; text-decoration:none; }
+  /* While the whole suite runs, selection does not exist. */
+  body[data-state="run-all"] .selbox, body[data-state="run-all"] #sel-failed { visibility:hidden; }
+  .selbar { position:fixed; left:0; right:0; bottom:0; z-index:15; display:flex; align-items:center; gap:10px; padding:10px max(28px, calc(50% - 600px)); background:var(--panel); border-top:1px solid var(--line); box-shadow:0 -12px 32px rgba(0,0,0,.18); }
+  .selbar .selmsg { font-weight:500; }
+  .selbar .el { font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--muted); }
+  body.has-sel .page { padding-bottom:120px; }
+
+  /* ---------- never run ---------- */
+  .empty { max-width:700px; }
+  .empty h1 { font-size:18px; font-weight:600; letter-spacing:-.01em; }
+  .empty .lead { margin-top:8px; }
+  .what { list-style:none; padding:0; margin:16px 0 4px; display:grid; gap:8px; }
+  .what li { display:grid; grid-template-columns:14px 1fr; gap:8px; color:var(--muted); }
+  .what li::before { content:""; width:6px; height:6px; margin-top:7px; border-radius:1.5px; background:var(--accent); }
+  .what li b { color:var(--text); font-weight:500; }
+  fieldset { border:0; padding:0; margin-top:18px; }
+  legend { font-weight:500; color:var(--muted); margin-bottom:8px; }
+  .iso2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .iso2 label { display:grid; grid-template-columns:auto 1fr; gap:4px 10px; align-items:start; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); cursor:pointer; }
+  .iso2 label:has(input:checked) { border-color:var(--accent); }
+  .iso2 label:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:2px; }
+  .iso2 input { margin-top:3px; accent-color:var(--accent); outline:none; }
+  .iso2 strong { font-weight:500; } .iso2 span { grid-column:2; color:var(--muted); }
+  .opts { display:flex; gap:22px; margin-top:12px; }
+  .opts label { display:flex; gap:8px; align-items:center; }
+  .opts input { accent-color:var(--accent); }
+  .empty .primary { margin-top:18px; }
+
+  @media (max-width:900px) {
+    .bar .stat, .bar .ext, .bar .analysis { display:none; }
+    .verdict { grid-template-columns:auto 1fr; } .vacts { grid-column:1 / -1; }
+    .fmeta, .fbody { padding-left:16px; }
+    .trow { grid-template-columns:16px 18px 16px minmax(0,1fr) auto 64px; } .trow .cnt, .trow .rowrun { display:none; }
+    .iso2 { grid-template-columns:1fr; } .exgrid { grid-template-columns:1fr; } .exgrid dt { margin-top:4px; }
+  }
+</style>
+</head>
+<body data-state="fail">
+
+<!-- MOCKUP CONTROLS: outside the app frame -->
+<div class="mock" role="region" aria-label="Controles do mockup">
+  <strong>Controles do mockup, fora do app</strong>
+  <div class="seg" role="group" aria-label="Estado da aba">
+    <button type="button" data-set-state="fail" aria-pressed="true">Com falhas</button>
+    <button type="button" data-set-state="pass" aria-pressed="false">Tudo passou</button>
+    <button type="button" data-set-state="run-all" aria-pressed="false">Executando tudo</button>
+    <button type="button" data-set-state="run-one" aria-pressed="false">Executando um teste</button>
+    <button type="button" data-set-state="never" aria-pressed="false">Nunca executado</button>
+  </div>
+  <button type="button" class="ghost" id="theme">Tema claro</button>
+  <span class="note">Interações falsas: abrir e fechar, menu, filtros, seleção e “Executar selecionados”, “Explicar o erro” no terceiro cartão.</span>
+</div>
+
+<div class="app">
+  <header class="bar">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="var(--accent)" stroke-width="1.8"/><path d="M5.5 8.5h6M8.5 5.5v6" stroke="var(--add)" stroke-width="1.6" stroke-linecap="round"/><path d="M13 13l5 5" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/></svg>
+      DiffLens
+    </div>
+    <nav class="crumb" aria-label="Onde você está">
+      <span class="c">Projetos</span><span>/</span><span class="c">identity-api</span>
+      <span class="compare mono"><span>feat/edge-signup</span><span class="into">para</span><span>main</span></span>
+      <span class="stat mono">41 arquivos <span class="a">+2.318</span> <span class="d">−406</span></span>
+      <a class="ext" href="#" onclick="return false">PR #87<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 1.5h5v5M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="analysis"><i></i><span>Analisado <code>e7f3b10</code>, há 12 min</span></div>
+    <span class="ghost">Preferências</span>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Visões da revisão">
+    <span class="tab" role="tab" aria-selected="false">Visão geral</span>
+    <span class="tab" role="tab" aria-selected="false">Flow</span>
+    <span class="tab" role="tab" aria-selected="false">Diff</span>
+    <span class="tab" role="tab" aria-selected="true">Testes<span class="count" data-in="fail run-one run-all">3 falhando</span></span>
+    <span class="tab" role="tab" aria-selected="false">Qualidade</span>
+    <span class="tab" role="tab" aria-selected="false">Insights<span class="count ai">4 achados</span></span>
+    <span class="tab" role="tab" aria-selected="false">Executar</span>
+  </nav>
+
+  <main class="page" id="page">
+
+    <!-- ===================== NEVER RUN ===================== -->
+    <section class="empty" data-in="never" aria-labelledby="never-title">
+      <h1 id="never-title">Os testes desta revisão ainda não foram executados</h1>
+      <p class="lead prose">Nada roda até você pedir. Executar os testes roda o código deste projeto nesta máquina, na própria cópia da branch que o DiffLens mantém, nunca na sua pasta.</p>
+      <ul class="what">
+        <li><span>Roda <code>go test ./...</code> em todos os pacotes, com o <b>detector de data race</b> e medindo a <b>cobertura das linhas alteradas</b>.</span></li>
+        <li><span>As dependências são baixadas primeiro, sem executar o código do projeto. Depois, no sandbox, <b>sem rede</b>.</span></li>
+        <li><span>Num projeto deste tamanho, <b>leva alguns minutos</b>. Uma execução para sozinha após 10 minutos.</span></li>
+        <li><span>Você pode continuar revisando nas outras abas enquanto ela roda.</span></li>
+      </ul>
+      <fieldset>
+        <legend>Onde os testes rodam</legend>
+        <div class="iso2">
+          <label><input type="radio" name="iso" checked><strong>Sandbox</strong><span>Sem rede. Só pode escrever dentro da própria cópia da branch.</span></label>
+          <label><input type="radio" name="iso"><strong>Processo comum</strong><span>Roda como você, com acesso a tudo que você alcança. O mais rápido. Para código em que você confia.</span></label>
+        </div>
+      </fieldset>
+      <div class="opts">
+        <label><input type="checkbox" checked> Detector de data race</label>
+        <label><input type="checkbox" checked> Medir cobertura</label>
+      </div>
+      <button type="button" class="primary">Executar testes</button>
+    </section>
+
+    <!-- ===================== RUNNING THE WHOLE SUITE ===================== -->
+    <section class="runbox" data-in="run-all" role="status" aria-label="Executando os testes">
+      <div class="runhead">
+        <span class="spin" aria-hidden="true"></span>
+        <h1>Executando todos os testes no sandbox</h1>
+        <span class="el">0:52</span>
+        <button type="button" class="secondary keep">Cancelar</button>
+      </div>
+      <div class="prog" role="progressbar" aria-label="Pacotes concluídos" aria-valuemin="0" aria-valuemax="167" aria-valuenow="48"><i></i></div>
+      <div class="runfacts">
+        <span><b>48</b> de <b>167</b> pacotes</span>
+        <span><b>2.611</b> testes até agora, nenhum falhando</span>
+        <span>a última execução levou 2 min 5 s</span>
+        <span>agora em <code>app/services/billing_service</code></span>
+      </div>
+      <p class="prevnote"><em>execução anterior</em>Abaixo, o resultado de há 6 min. Ele é substituído quando esta execução terminar.</p>
+    </section>
+
+    <!-- ===================== VERDICT: FAILURES ===================== -->
+    <section class="verdict fail" data-in="fail run-one" aria-labelledby="v-fail">
+      <span class="vmark" aria-hidden="true">✕</span>
+      <div>
+        <h1 id="v-fail">2 testes falharam e 1 pacote não compilou</h1>
+        <p class="vsub">Em <code>app/controllers</code>, <code>app/services/auth_service</code> e <code>app/containers</code>. Todo o resto passou.</p>
+      </div>
+      <div class="vacts">
+        <button type="button" class="secondary" data-run-btn>Executar só os que falharam</button>
+        <span class="split">
+          <button type="button" class="primary" data-run-btn>Executar tudo</button>
+          <button type="button" class="primary caret" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-fail" aria-label="Opções da execução" data-run-btn><span class="chev"></span></button>
+        </span>
+        <div class="menu" id="menu-fail" role="menu" aria-label="Opções da execução" hidden>
+          <p class="mh">Onde rodar</p>
+          <button type="button" role="menuitemradio" aria-checked="true"><span class="ck">✓</span><span>No sandbox <span class="last">· último usado</span></span><small>Sem rede. Só escreve na própria cópia da branch.</small></button>
+          <button type="button" role="menuitemradio" aria-checked="false"><span class="ck"></span><span>Como processo comum</span><small>Mais rápido. Para código em que você confia.</small></button>
+          <hr>
+          <button type="button" role="menuitemcheckbox" aria-checked="true"><span class="ck">✓</span><span>Detector de data race</span><small>Sem ele, roda cerca de 3× mais rápido.</small></button>
+          <button type="button" role="menuitemcheckbox" aria-checked="true"><span class="ck">✓</span><span>Medir cobertura</span><small>Sem ela, a cobertura das linhas alteradas some.</small></button>
+          <hr>
+          <p class="mh">Valem para a próxima execução, de qualquer botão.</p>
+        </div>
+      </div>
+      <ul class="facts" aria-label="Números da execução">
+        <li><b>8.971</b> passando</li>
+        <li><b class="bad">2</b> falhando</li>
+        <li><b class="bad">1</b> pacote não compilou</li>
+        <li><b>12</b> pulados</li>
+        <li><b>409</b> adicionados nesta branch</li>
+        <li><button type="button" aria-expanded="false" aria-controls="cov-fail"><b>94%</b> das linhas alteradas cobertas<span class="chev"></span></button></li>
+        <li><b>2 min 5 s</b> de execução</li>
+        <li>há 6 min, em <code>e7f3b10</code></li>
+        <li class="iso">no sandbox, sem rede, com detector de data race</li>
+      </ul>
+      <div class="covpanel" id="cov-fail" hidden>
+        <ul class="covs" aria-label="Cobertura das linhas alteradas, por arquivo">
+          <li><button type="button" class="loc">app/services/auth_service/service.go</button><div class="cbar"><i style="width:91%"></i></div><span>91%</span></li>
+          <li><button type="button" class="loc">app/services/auth_service/password_policy.go</button><div class="cbar"><i style="width:100%"></i></div><span>100%</span></li>
+          <li><button type="button" class="loc">app/controllers/edge_login.go</button><div class="cbar mid"><i style="width:76%"></i></div><span>76%</span></li>
+          <li><button type="button" class="loc">app/services/auth_service/ad.go</button><div class="cbar"><i style="width:97%"></i></div><span>97%</span></li>
+        </ul>
+        <p class="hint">Abre o arquivo no Diff. A cobertura por função fica na aba Qualidade.</p>
+      </div>
+    </section>
+
+    <!-- ===================== VERDICT: ALL PASSED ===================== -->
+    <section class="verdict pass" data-in="pass" aria-labelledby="v-pass">
+      <span class="vmark" aria-hidden="true">✓</span>
+      <div>
+        <h1 id="v-pass">Todos os 8.974 testes passaram</h1>
+        <p class="vsub">Em 167 pacotes, sem data race.</p>
+      </div>
+      <div class="vacts">
+        <span class="split">
+          <button type="button" class="primary">Executar tudo</button>
+          <button type="button" class="primary caret" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-pass" aria-label="Opções da execução"><span class="chev"></span></button>
+        </span>
+        <div class="menu" id="menu-pass" role="menu" aria-label="Opções da execução" hidden>
+          <p class="mh">Onde rodar</p>
+          <button type="button" role="menuitemradio" aria-checked="true"><span class="ck">✓</span><span>No sandbox <span class="last">· último usado</span></span><small>Sem rede. Só escreve na própria cópia da branch.</small></button>
+          <button type="button" role="menuitemradio" aria-checked="false"><span class="ck"></span><span>Como processo comum</span><small>Mais rápido. Para código em que você confia.</small></button>
+          <hr>
+          <button type="button" role="menuitemcheckbox" aria-checked="true"><span class="ck">✓</span><span>Detector de data race</span><small>Sem ele, roda cerca de 3× mais rápido.</small></button>
+          <button type="button" role="menuitemcheckbox" aria-checked="true"><span class="ck">✓</span><span>Medir cobertura</span><small>Sem ela, a cobertura das linhas alteradas some.</small></button>
+        </div>
+      </div>
+      <ul class="facts" aria-label="Números da execução">
+        <li><b>8.974</b> passando</li>
+        <li><b>12</b> pulados</li>
+        <li><b>409</b> adicionados nesta branch</li>
+        <li><button type="button" aria-expanded="false" aria-controls="cov-pass"><b>94%</b> das linhas alteradas cobertas<span class="chev"></span></button></li>
+        <li><b>2 min 1 s</b> de execução</li>
+        <li>há 3 min, em <code>f21a09c</code></li>
+        <li class="iso">no sandbox, sem rede, com detector de data race</li>
+      </ul>
+      <div class="covpanel" id="cov-pass" hidden>
+        <ul class="covs" aria-label="Cobertura das linhas alteradas, por arquivo">
+          <li><button type="button" class="loc">app/services/auth_service/service.go</button><div class="cbar"><i style="width:91%"></i></div><span>91%</span></li>
+          <li><button type="button" class="loc">app/services/auth_service/password_policy.go</button><div class="cbar"><i style="width:100%"></i></div><span>100%</span></li>
+          <li><button type="button" class="loc">app/controllers/edge_login.go</button><div class="cbar mid"><i style="width:76%"></i></div><span>76%</span></li>
+          <li><button type="button" class="loc">app/containers/auth_container.go</button><div class="cbar"><i style="width:100%"></i></div><span>100%</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===================== PREVIOUS / CURRENT RESULTS ===================== -->
+    <div class="previous" data-in="fail run-one run-all pass">
+
+      <!-- ---------- Failures ---------- -->
+      <section data-in="fail run-one run-all" aria-labelledby="fails-title">
+        <div class="secthead">
+          <h2 class="sect" id="fails-title">Falhas <span class="n">3</span></h2>
+          <button type="button" class="linkish" id="sel-failed">Selecionar todos que falharam</button>
+        </div>
+        <div class="fails">
+
+          <!-- Failure 1: data race, explanation answered -->
+          <article class="fcard" id="f1" aria-labelledby="f1-name">
+            <header class="fhead">
+              <input type="checkbox" class="selbox" data-key="app/controllers|TestSignUpFromEdge_CreatesAndLogsIn" aria-label="Selecionar TestSignUpFromEdge_CreatesAndLogsIn">
+              <button type="button" class="ftoggle" aria-expanded="true" aria-controls="f1-body"><span class="chev"></span><span class="o fail" aria-label="falhou">✕</span><code id="f1-name">TestSignUpFromEdge_CreatesAndLogsIn</code></button>
+              <em class="kind">data race</em>
+              <span class="fdur">1,84 s</span>
+              <p class="fmeta"><code>app/controllers</code><button type="button" class="loc">edge_login_test.go:412</button><em class="tag new">novo</em></p>
+            </header>
+            <div class="fbody" id="f1-body">
+              <div class="inlinerun" data-in="run-one" role="status">
+                <span class="spin" aria-hidden="true"></span>
+                <span>Executando este teste e os 2 subtestes</span>
+                <span class="el">0:04</span>
+                <button type="button" class="secondary sm">Cancelar</button>
+              </div>
+              <div class="fresult">
+                <ul class="subs" aria-label="Subtestes">
+                  <li class="sub"><input type="checkbox" class="selbox" data-key="app/controllers|TestSignUpFromEdge_CreatesAndLogsIn|v1, the country of the edge" data-failed aria-label="Selecionar o subteste v1, the country of the edge"><span class="o fail" aria-label="falhou">✕</span><span class="nm">v1, the country of the edge</span><button type="button" class="rowrun" title="go test -race -run '^TestSignUpFromEdge_CreatesAndLogsIn$/^v1,_the_country_of_the_edge$' ./app/controllers">Executar</button><small>0,92 s</small></li>
+                  <li class="sub"><input type="checkbox" class="selbox" data-key="app/controllers|TestSignUpFromEdge_CreatesAndLogsIn|v2" data-failed aria-label="Selecionar o subteste v2"><span class="o fail" aria-label="falhou">✕</span><span class="nm">v2</span><button type="button" class="rowrun" title="go test -race -run '^TestSignUpFromEdge_CreatesAndLogsIn$/^v2$' ./app/controllers">Executar</button><small>0,88 s</small></li>
+                </ul>
+
+                <div class="excerpt" style="margin-top:12px">
+                  <p class="eh"><strong>Duas goroutines acessaram a mesma memória sem sincronização</strong><span>nos dois subtestes</span></p>
+                  <div class="race">
+                    <div>
+                      <span class="verb w">Escrita</span>
+                      <button type="button" class="loc">service.go:661</button>
+                      <span class="who">em <code>(*Service).recordLastLogin</code>, por uma goroutine em segundo plano criada em <button type="button" class="loc">password_policy.go:90</button></span>
+                    </div>
+                    <div>
+                      <span class="verb r">Leitura</span>
+                      <button type="button" class="loc">edge_login_test.go:437</button>
+                      <span class="who">pelo próprio teste, antes da escrita</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="factions">
+                <button type="button" class="secondary sm" data-run-btn title="go test -race -run '^TestSignUpFromEdge_CreatesAndLogsIn$' ./app/controllers">Executar este teste</button>
+                <button type="button" class="secondary sm">Abrir no Diff</button>
+                <button type="button" class="outtoggle" aria-expanded="false" aria-controls="f1-out"><span class="chev"></span><span data-closed="Ver saída completa" data-open="Ocultar saída completa">Ver saída completa</span></button>
+              </div>
+              <pre class="out" id="f1-out" hidden aria-label="Saída do teste e relatório do data race"><span>=== RUN   TestSignUpFromEdge_CreatesAndLogsIn</span><span>=== RUN   TestSignUpFromEdge_CreatesAndLogsIn/v1,_the_country_of_the_edge</span><span>==================</span><span class="hl">WARNING: DATA RACE</span><span>Write at 0x00c0004b2a38 by goroutine 214:</span><span>  app/services/auth_service.(*Service).recordLastLogin()</span><span class="hl">      /work/app/services/auth_service/service.go:661 +0x84</span><span>  app/services/auth_service.(*PasswordPolicy).checkAsync.func1()</span><span>      /work/app/services/auth_service/password_policy.go:94 +0x1d0</span><span> </span><span>Previous read at 0x00c0004b2a38 by goroutine 7:</span><span>  app/controllers.TestSignUpFromEdge_CreatesAndLogsIn.func1()</span><span class="hl">      /work/app/controllers/edge_login_test.go:437 +0x5a4</span><span>  testing.tRunner()</span><span>      /usr/local/go/src/testing/testing.go:1792 +0x225</span><span> </span><span>Goroutine 214 (running) created at:</span><span>  app/services/auth_service.(*PasswordPolicy).checkAsync()</span><span class="hl">      /work/app/services/auth_service/password_policy.go:90 +0x2b0</span><span>  app/services/auth_service.(*Service).SignUpFromEdge()</span><span>      /work/app/services/auth_service/service.go:412 +0x6e4</span><span>  app/controllers.(*EdgeController).SignUp()</span><span>      /work/app/controllers/edge_login.go:58 +0x31c</span><span>==================</span><span>    testing.go:1490: race detected during execution of test</span><span>=== RUN   TestSignUpFromEdge_CreatesAndLogsIn/v2</span><span>    testing.go:1490: race detected during execution of test</span><span>--- FAIL: TestSignUpFromEdge_CreatesAndLogsIn (1.84s)</span><span>    --- FAIL: TestSignUpFromEdge_CreatesAndLogsIn/v1,_the_country_of_the_edge (0.92s)</span><span>    --- FAIL: TestSignUpFromEdge_CreatesAndLogsIn/v2 (0.88s)</span><span>FAIL</span></pre>
+
+              <section class="explain fresult" aria-labelledby="f1-ex">
+                <header>
+                  <strong id="f1-ex">Por que falhou</strong>
+                  <em class="t-ai">Modelo</em>
+                  <em class="origin" title="Origem: código, teste, instável ou ambiente"><b>origem:</b> código</em>
+                  <span class="by">Escrita por Claude Code, modelo claude-opus-5-5, agora</span>
+                </header>
+                <dl class="exgrid">
+                  <dt>Causa</dt>
+                  <dd><code>checkAsync</code> grava <code>lastLogin</code> numa goroutine que continua rodando depois que <code>SignUpFromEdge</code> retorna, e o teste lê o campo logo em seguida. A corrida é do código, não do teste: qualquer leitura de <code>lastLogin</code> durante um login tem o mesmo problema em produção.</dd>
+                  <dt>Onde</dt>
+                  <dd><button type="button" class="loc">app/services/auth_service/service.go:661</button></dd>
+                  <dt>Correção proposta</dt>
+                  <dd>Proteger o campo com o mutex que o <code>Service</code> já tem, aqui e na leitura em <button type="button" class="loc">service.go:670</button>.
+                    <div class="snippet" aria-label="Trecho de código proposto"><span class="ctx"><span class="k">func</span> (s *<span class="ty">Service</span>) recordLastLogin(at <span class="ty">time.Time</span>) {</span><span class="add">	s.mu.Lock()</span><span class="add">	<span class="k">defer</span> s.mu.Unlock()</span><span class="ctx">	s.lastLogin = at</span><span class="ctx">}</span></div>
+                  </dd>
+                </dl>
+                <div class="exacts">
+                  <button type="button" class="secondary sm" data-copy>Copiar como prompt para o agente</button>
+                  <button type="button" class="linkish" title="Explicar o erro de novo com Claude Code, modelo claude-opus-5-5: uma chamada ao modelo">Explicar de novo</button>
+                </div>
+              </section>
+            </div>
+          </article>
+
+          <!-- Failure 2: assertion, explanation loading -->
+          <article class="fcard" id="f2" aria-labelledby="f2-name">
+            <header class="fhead">
+              <input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError" aria-label="Selecionar TestAuthenticateAD_EveryRefusalIsTheGenericError">
+              <button type="button" class="ftoggle" aria-expanded="true" aria-controls="f2-body"><span class="chev"></span><span class="o fail" aria-label="falhou">✕</span><code id="f2-name">TestAuthenticateAD_EveryRefusalIsTheGenericError</code></button>
+              <em class="kind">asserção</em>
+              <span class="fdur">0,04 s</span>
+              <p class="fmeta"><code>app/services/auth_service</code><button type="button" class="loc">auth_service_test.go:196</button><em class="tag mod">alterado</em></p>
+            </header>
+            <div class="fbody" id="f2-body">
+              <ul class="subs" aria-label="Subtestes">
+                <li class="sub"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError|AD refuses" data-failed aria-label="Selecionar o subteste AD refuses"><span class="o fail" aria-label="falhou">✕</span><span class="nm">AD refuses</span><button type="button" class="rowrun" title="go test -race -run '^TestAuthenticateAD_EveryRefusalIsTheGenericError$/^AD_refuses$' ./app/services/auth_service">Executar</button><small>0,01 s</small></li>
+                <li class="sub"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError|AD accepts" aria-label="Selecionar o subteste AD accepts"><span class="o pass" aria-label="passou">✓</span><span class="nm passing">AD accepts</span><button type="button" class="rowrun">Executar</button><small>0,01 s</small></li>
+                <li class="sub"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError|AD unreachable" aria-label="Selecionar o subteste AD unreachable"><span class="o pass" aria-label="passou">✓</span><span class="nm passing">AD unreachable</span><button type="button" class="rowrun">Executar</button><small>0,01 s</small></li>
+                <li class="sub"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError|AD times out" aria-label="Selecionar o subteste AD times out"><span class="o pass" aria-label="passou">✓</span><span class="nm passing">AD times out</span><button type="button" class="rowrun">Executar</button><small>0,01 s</small></li>
+              </ul>
+
+              <div class="excerpt">
+                <p class="eh"><strong>Not equal</strong><span>em AD refuses, <button type="button" class="loc">auth_service_test.go:218</button></span></p>
+                <dl class="assert">
+                  <dt>Esperado</dt><dd class="exp">"credenciais inválidas"</dd>
+                  <dt>Recebido</dt><dd class="got">"ldap: invalid credentials (49)"</dd>
+                </dl>
+              </div>
+
+              <div class="factions">
+                <button type="button" class="secondary sm" data-run-btn>Executar este teste</button>
+                <button type="button" class="secondary sm">Abrir no Diff</button>
+                <button type="button" class="outtoggle" aria-expanded="false" aria-controls="f2-out"><span class="chev"></span><span data-closed="Ver saída completa" data-open="Ocultar saída completa">Ver saída completa</span></button>
+              </div>
+              <pre class="out" id="f2-out" hidden aria-label="Saída do teste"><span>=== RUN   TestAuthenticateAD_EveryRefusalIsTheGenericError</span><span>=== RUN   TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_accepts</span><span>=== RUN   TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_refuses</span><span class="hl">    auth_service_test.go:218:</span><span>        	Error Trace:	/work/app/services/auth_service/auth_service_test.go:218</span><span>        	Error:      	Not equal:</span><span>        	            	expected: "credenciais inválidas"</span><span>        	            	actual  : "ldap: invalid credentials (49)"</span><span>        	Test:       	TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_refuses</span><span>=== RUN   TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_unreachable</span><span>=== RUN   TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_times_out</span><span>--- FAIL: TestAuthenticateAD_EveryRefusalIsTheGenericError (0.04s)</span><span>    --- PASS: TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_accepts (0.01s)</span><span>    --- FAIL: TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_refuses (0.01s)</span><span>    --- PASS: TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_unreachable (0.01s)</span><span>    --- PASS: TestAuthenticateAD_EveryRefusalIsTheGenericError/AD_times_out (0.01s)</span><span>FAIL</span></pre>
+
+              <section class="explain" aria-labelledby="f2-ex" aria-busy="true">
+                <div class="loading" role="status">
+                  <p class="lh"><span class="spin ai" aria-hidden="true"></span><span id="f2-ex">Explicando o erro com Claude Code, modelo claude-opus-5-5</span><button type="button" class="linkish">Parar</button></p>
+                  <div class="sk" style="width:88%"></div>
+                  <div class="sk" style="width:64%"></div>
+                </div>
+              </section>
+            </div>
+          </article>
+
+          <!-- Failure 3: package did not build, explanation on click -->
+          <article class="fcard" id="f3" aria-labelledby="f3-name">
+            <header class="fhead">
+              <input type="checkbox" class="selbox" data-key="app/containers" data-count="38" data-failed aria-label="Selecionar o pacote app/containers">
+              <button type="button" class="ftoggle" aria-expanded="true" aria-controls="f3-body"><span class="chev"></span><span class="o fail" aria-label="falhou">✕</span><code id="f3-name">app/containers</code></button>
+              <em class="kind">não compilou</em>
+              <span class="fdur">—</span>
+              <p class="fmeta"><span>Pacote inteiro: os 38 testes dele não rodaram</span><button type="button" class="loc">auth_container.go:47</button></p>
+            </header>
+            <div class="fbody" id="f3-body">
+              <div class="excerpt">
+                <div class="compile"><span class="hl">auth_container.go:47:31: not enough arguments in call to auth_service.NewService</span>	have (*sql.DB, *ldap.Client)
+	want (*sql.DB, *ldap.Client, auth_service.PasswordPolicy)</div>
+              </div>
+
+              <div class="factions">
+                <button type="button" class="aibtn" id="f3-explain" title="Explicar o erro com Claude Code, modelo claude-opus-5-5: uma chamada ao modelo">Explicar o erro</button>
+                <button type="button" class="secondary sm" data-run-btn title="go test -race ./app/containers">Executar este pacote</button>
+                <button type="button" class="secondary sm" disabled aria-describedby="f3-why">Abrir no Diff</button>
+                <span class="disabledwhy" id="f3-why">Este arquivo não foi alterado nesta revisão, por isso a aba Diff não o mostra.</span>
+                <span class="sep"></span>
+                <button type="button" class="outtoggle" aria-expanded="false" aria-controls="f3-out"><span class="chev"></span><span data-closed="Ver saída completa" data-open="Ocultar saída completa">Ver saída completa</span></button>
+              </div>
+              <pre class="out" id="f3-out" hidden aria-label="Saída do compilador"><span># app/containers [app/containers.test]</span><span class="hl">app/containers/auth_container.go:47:31: not enough arguments in call to auth_service.NewService</span><span>	have (*sql.DB, *ldap.Client)</span><span>	want (*sql.DB, *ldap.Client, auth_service.PasswordPolicy)</span><span>FAIL	app/containers [build failed]</span></pre>
+
+              <section class="explain" id="f3-loading" hidden aria-busy="true">
+                <div class="loading" role="status">
+                  <p class="lh"><span class="spin ai" aria-hidden="true"></span><span>Explicando o erro com Claude Code, modelo claude-opus-5-5</span><button type="button" class="linkish">Parar</button></p>
+                  <div class="sk" style="width:88%"></div>
+                  <div class="sk" style="width:64%"></div>
+                </div>
+              </section>
+              <section class="explain" id="f3-answer" hidden aria-labelledby="f3-ex" tabindex="-1">
+                <header>
+                  <strong id="f3-ex">Por que falhou</strong>
+                  <em class="t-ai">Modelo</em>
+                  <em class="origin" title="Origem: código, teste, instável ou ambiente"><b>origem:</b> código</em>
+                  <span class="by">Escrita por Claude Code, modelo claude-opus-5-5, agora</span>
+                </header>
+                <dl class="exgrid">
+                  <dt>Causa</dt>
+                  <dd>Esta branch acrescentou o parâmetro <code>PasswordPolicy</code> a <code>NewService</code>, mas o container que monta o serviço não foi atualizado e ainda o chama com dois argumentos.</dd>
+                  <dt>Onde</dt>
+                  <dd><button type="button" class="loc off" title="Este arquivo não foi alterado nesta revisão, por isso a aba Diff não o mostra">app/containers/auth_container.go:47</button>, chamando <button type="button" class="loc">service.go:88</button></dd>
+                  <dt>Correção proposta</dt>
+                  <dd>Passar a política padrão, a mesma que os testes do serviço usam.
+                    <div class="snippet" aria-label="Trecho de código proposto"><span class="ctx"><span class="c">// app/containers/auth_container.go:47</span></span><span class="add">svc := auth_service.NewService(db, ldapClient, auth_service.DefaultPasswordPolicy())</span></div>
+                  </dd>
+                </dl>
+                <div class="exacts">
+                  <button type="button" class="secondary sm" data-copy>Copiar como prompt para o agente</button>
+                  <button type="button" class="linkish">Explicar de novo</button>
+                </div>
+              </section>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ---------- Whole suite browser ---------- -->
+      <section class="browser" aria-label="Todos os testes">
+        <button type="button" class="btoggle keep" id="browser-toggle" aria-expanded="true" aria-controls="browser-body">
+          <span class="chev"></span>
+          <strong>Todos os testes</strong>
+          <span data-in="fail run-one run-all">8.985 testes em 167 pacotes, <span class="bad">3 falhas</span></span>
+          <span data-in="pass">8.986 testes em 167 pacotes, <span class="ok">nenhum falhando</span></span>
+        </button>
+        <div class="bbody" id="browser-body">
+          <div class="btools">
+            <input class="search" type="search" placeholder="Buscar teste ou pacote" aria-label="Buscar teste ou pacote">
+            <div role="group" aria-label="Filtros" style="display:flex;gap:6px">
+              <button type="button" class="fchip" aria-pressed="false">Com falha<b>3</b></button>
+              <button type="button" class="fchip" aria-pressed="false">Passando<b>8.971</b></button>
+              <button type="button" class="fchip" aria-pressed="false">Pulados<b>12</b></button>
+              <button type="button" class="fchip" aria-pressed="false">Desta branch<b>409</b></button>
+            </div>
+            <p class="hint">Falhas primeiro. Subtestes contam dentro do teste pai.</p>
+          </div>
+
+          <ul class="tree">
+            <!-- package that did not build -->
+            <li>
+              <div class="trow pkg">
+                <input type="checkbox" class="selbox" data-key="app/containers" data-count="38" data-failed aria-label="Selecionar o pacote app/containers">
+                <button type="button" class="tog" aria-expanded="false" aria-controls="p-cont" aria-label="Abrir app/containers"><span class="chev" aria-hidden="true"></span></button>
+                <span class="o fail" aria-label="não compilou">✕</span>
+                <span class="nm"><code>app/containers</code></span>
+                <span class="mk"></span>
+                <span class="cnt"><span class="bad">não compilou</span>, 38 testes</span>
+                <span class="du">—</span>
+                <button type="button" class="rowrun" data-run-btn>Executar</button>
+              </div>
+              <ul id="p-cont" hidden><li><p class="more">Nenhum teste rodou: o pacote não compilou.</p></li></ul>
+            </li>
+
+            <!-- failing package, collapsed -->
+            <li>
+              <div class="trow pkg">
+                <input type="checkbox" class="selbox" data-key="app/controllers" aria-label="Selecionar o pacote app/controllers">
+                <button type="button" class="tog" aria-expanded="false" aria-controls="p-ctrl" aria-label="Abrir app/controllers"><span class="chev" aria-hidden="true"></span></button>
+                <span class="o fail" aria-label="falhou">✕</span>
+                <span class="nm"><code>app/controllers</code></span>
+                <span class="mk"><em class="tag new">9 novos</em></span>
+                <span class="cnt"><span class="bad">1 falhando</span>, 212 passando</span>
+                <span class="du">14,2 s</span>
+                <button type="button" class="rowrun" data-run-btn>Executar</button>
+              </div>
+              <ul id="p-ctrl" hidden>
+                <li><div class="trow"><input type="checkbox" class="selbox" data-key="app/controllers|TestSignUpFromEdge_CreatesAndLogsIn" aria-label="Selecionar TestSignUpFromEdge_CreatesAndLogsIn"><span></span><span class="o fail">✕</span><span class="nm">TestSignUpFromEdge_CreatesAndLogsIn</span><span class="mk"><em class="tag new">novo</em></span><span class="cnt"><span class="bad">2 de 2 falhando</span></span><span class="du">1,84 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+                <li><button type="button" class="more" data-key="app/controllers|*" data-count="212">Mostrar os outros 212 testes, todos passando</button></li>
+              </ul>
+            </li>
+
+            <!-- failing package, expanded -->
+            <li>
+              <div class="trow pkg">
+                <input type="checkbox" class="selbox" data-key="app/services/auth_service" aria-label="Selecionar o pacote app/services/auth_service">
+                <button type="button" class="tog" aria-expanded="true" aria-controls="p-auth" aria-label="Fechar app/services/auth_service"><span class="chev" aria-hidden="true"></span></button>
+                <span class="o fail" aria-label="falhou">✕</span>
+                <span class="nm"><code>app/services/auth_service</code></span>
+                <span class="mk"><em class="tag new">31 novos</em><em class="tag mod">4 alterados</em></span>
+                <span class="cnt"><span class="bad">1 falhando</span>, 187 passando</span>
+                <span class="du">22,6 s</span>
+                <button type="button" class="rowrun" data-run-btn>Executar</button>
+              </div>
+              <ul id="p-auth">
+                <li>
+                  <div class="trow">
+                    <input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError" aria-label="Selecionar TestAuthenticateAD_EveryRefusalIsTheGenericError">
+                    <button type="button" class="tog" aria-expanded="true" aria-controls="t-ad" aria-label="Fechar os subtestes"><span class="chev" aria-hidden="true"></span></button>
+                    <span class="o fail" aria-label="falhou">✕</span>
+                    <span class="nm">TestAuthenticateAD_EveryRefusalIsTheGenericError</span>
+                    <span class="mk"><em class="tag mod">alterado</em></span>
+                    <span class="cnt"><span class="bad">1 de 4 falhando</span></span>
+                    <span class="du">0,04 s</span>
+                    <button type="button" class="rowrun" data-run-btn>Executar</button>
+                  </div>
+                  <ul id="t-ad">
+                    <li><div class="trow sub2"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError|AD refuses" data-failed aria-label="Selecionar o subteste AD refuses"><span></span><span class="o fail">✕</span><span class="nm f">AD refuses</span><span class="mk"></span><span class="cnt"></span><span class="du">0,01 s</span><button type="button" class="rowrun">Executar</button></div></li>
+                    <li><div class="trow sub2"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError|AD accepts" aria-label="Selecionar o subteste AD accepts"><span></span><span class="o pass">✓</span><span class="nm">AD accepts</span><span class="mk"></span><span class="cnt"></span><span class="du">0,01 s</span><button type="button" class="rowrun">Executar</button></div></li>
+                    <li><div class="trow sub2"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError|AD unreachable" aria-label="Selecionar o subteste AD unreachable"><span></span><span class="o pass">✓</span><span class="nm">AD unreachable</span><span class="mk"></span><span class="cnt"></span><span class="du">0,01 s</span><button type="button" class="rowrun">Executar</button></div></li>
+                    <li><div class="trow sub2"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_EveryRefusalIsTheGenericError|AD times out" aria-label="Selecionar o subteste AD times out"><span></span><span class="o pass">✓</span><span class="nm">AD times out</span><span class="mk"></span><span class="cnt"></span><span class="du">0,01 s</span><button type="button" class="rowrun">Executar</button></div></li>
+                  </ul>
+                </li>
+                <li>
+                  <div class="trow">
+                    <input type="checkbox" class="selbox" data-key="app/services/auth_service|TestSignUpFromEdge_ValidatesCountry" aria-label="Selecionar TestSignUpFromEdge_ValidatesCountry">
+                    <button type="button" class="tog" aria-expanded="false" aria-controls="t-country" aria-label="Abrir os subtestes"><span class="chev" aria-hidden="true"></span></button>
+                    <span class="o pass" aria-label="passou">✓</span>
+                    <span class="nm passing">TestSignUpFromEdge_ValidatesCountry</span>
+                    <span class="mk"><em class="tag new">novo</em></span>
+                    <span class="cnt">6 subtestes</span>
+                    <span class="du">0,31 s</span>
+                    <button type="button" class="rowrun" data-run-btn>Executar</button>
+                  </div>
+                  <ul id="t-country" hidden>
+                    <li><div class="trow sub2"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestSignUpFromEdge_ValidatesCountry|accepts the country of the edge" aria-label="Selecionar o subteste accepts the country of the edge"><span></span><span class="o pass">✓</span><span class="nm">accepts the country of the edge</span><span class="mk"></span><span class="cnt"></span><span class="du">0,05 s</span><button type="button" class="rowrun">Executar</button></div></li>
+                    <li><div class="trow sub2"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestSignUpFromEdge_ValidatesCountry|refuses an unknown country" aria-label="Selecionar o subteste refuses an unknown country"><span></span><span class="o pass">✓</span><span class="nm">refuses an unknown country</span><span class="mk"></span><span class="cnt"></span><span class="du">0,05 s</span><button type="button" class="rowrun">Executar</button></div></li>
+                    <li><button type="button" class="more" data-key="app/services/auth_service|TestSignUpFromEdge_ValidatesCountry|*" data-count="4">Mostrar os outros 4 subtestes</button></li>
+                  </ul>
+                </li>
+                <li><div class="trow"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestPasswordPolicy_CheckAsyncReportsViolations" aria-label="Selecionar TestPasswordPolicy_CheckAsyncReportsViolations"><span></span><span class="o pass">✓</span><span class="nm passing">TestPasswordPolicy_CheckAsyncReportsViolations</span><span class="mk"><em class="tag new">novo</em></span><span class="cnt"></span><span class="du">0,12 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+                <li><div class="trow"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestPasswordPolicy_RejectsCommonPasswords" aria-label="Selecionar TestPasswordPolicy_RejectsCommonPasswords"><span></span><span class="o pass">✓</span><span class="nm passing">TestPasswordPolicy_RejectsCommonPasswords</span><span class="mk"><em class="tag new">novo</em></span><span class="cnt"></span><span class="du">0,02 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+                <li><div class="trow"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestNewService_RequiresPasswordPolicy" aria-label="Selecionar TestNewService_RequiresPasswordPolicy"><span></span><span class="o pass">✓</span><span class="nm passing">TestNewService_RequiresPasswordPolicy</span><span class="mk"><em class="tag new">novo</em></span><span class="cnt"></span><span class="du">0,01 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+                <li><div class="trow"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestRefreshToken_RotatesOnUse" aria-label="Selecionar TestRefreshToken_RotatesOnUse"><span></span><span class="o pass">✓</span><span class="nm passing">TestRefreshToken_RotatesOnUse</span><span class="mk"></span><span class="cnt"></span><span class="du">0,08 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+                <li><div class="trow"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestRefreshToken_RejectsReusedToken" aria-label="Selecionar TestRefreshToken_RejectsReusedToken"><span></span><span class="o pass">✓</span><span class="nm passing">TestRefreshToken_RejectsReusedToken</span><span class="mk"></span><span class="cnt"></span><span class="du">0,07 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+                <li><div class="trow"><input type="checkbox" class="selbox" data-key="app/services/auth_service|TestAuthenticateAD_AgainstRealServer" aria-label="Selecionar TestAuthenticateAD_AgainstRealServer"><span></span><span class="o skip" aria-label="pulado">–</span><span class="nm passing">TestAuthenticateAD_AgainstRealServer</span><span class="mk"></span><span class="cnt">pulado: precisa de LDAP_URL</span><span class="du">0 ms</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+                <li><button type="button" class="more" data-key="app/services/auth_service|*" data-count="180">Mostrar os outros 180 testes, todos passando</button></li>
+              </ul>
+            </li>
+
+            <!-- passing packages -->
+            <li><div class="trow pkg"><input type="checkbox" class="selbox" data-key="app/services/billing_service" data-count="418" aria-label="Selecionar o pacote app/services/billing_service"><button type="button" class="tog" aria-expanded="false" aria-label="Abrir app/services/billing_service"><span class="chev" aria-hidden="true"></span></button><span class="o pass" aria-label="passou">✓</span><span class="nm"><code>app/services/billing_service</code></span><span class="mk"></span><span class="cnt">418 passando</span><span class="du">9,4 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+            <li><div class="trow pkg"><input type="checkbox" class="selbox" data-key="app/repositories" data-count="1204" aria-label="Selecionar o pacote app/repositories"><button type="button" class="tog" aria-expanded="false" aria-label="Abrir app/repositories"><span class="chev" aria-hidden="true"></span></button><span class="o pass" aria-label="passou">✓</span><span class="nm"><code>app/repositories</code></span><span class="mk"><em class="tag mod">2 alterados</em></span><span class="cnt">1.204 passando</span><span class="du">31,7 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+            <li><div class="trow pkg"><input type="checkbox" class="selbox" data-key="app/http/middleware" data-count="96" aria-label="Selecionar o pacote app/http/middleware"><button type="button" class="tog" aria-expanded="false" aria-label="Abrir app/http/middleware"><span class="chev" aria-hidden="true"></span></button><span class="o pass" aria-label="passou">✓</span><span class="nm"><code>app/http/middleware</code></span><span class="mk"></span><span class="cnt">96 passando</span><span class="du">1,9 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+            <li><div class="trow pkg"><input type="checkbox" class="selbox" data-key="app/services/session_service" data-count="143" aria-label="Selecionar o pacote app/services/session_service"><button type="button" class="tog" aria-expanded="false" aria-label="Abrir app/services/session_service"><span class="chev" aria-hidden="true"></span></button><span class="o pass" aria-label="passou">✓</span><span class="nm"><code>app/services/session_service</code></span><span class="mk"><em class="tag new">12 novos</em></span><span class="cnt">143 passando</span><span class="du">4,1 s</span><button type="button" class="rowrun" data-run-btn>Executar</button></div></li>
+            <li><button type="button" class="more">Mostrar os outros 161 pacotes, todos passando</button></li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Selection bar: appears while at least one test is checked. -->
+  <div class="selbar" id="selbar" role="region" aria-label="Testes selecionados" hidden>
+    <span class="spin" id="sel-spin" aria-hidden="true" hidden></span>
+    <p class="selmsg" id="sel-msg" aria-live="polite"></p>
+    <span class="el" id="sel-el" hidden>0:00</span>
+    <span class="spacer"></span>
+    <button type="button" class="secondary" id="sel-clear">Limpar seleção</button>
+    <button type="button" class="primary" id="sel-run">Executar selecionados</button>
+    <button type="button" class="secondary" id="sel-cancel" hidden>Cancelar</button>
+  </div>
+</div>
+
+<script>
+  const states = ["fail", "pass", "run-all", "run-one", "never"];
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+  function setOpen(button, open) {
+    button.setAttribute("aria-expanded", String(open));
+    const target = document.getElementById(button.getAttribute("aria-controls"));
+    if (target) target.hidden = !open;
+    const label = $("[data-open]", button);
+    if (label) label.textContent = open ? label.dataset.open : label.dataset.closed;
+  }
+
+  // While a run goes on, nothing else can start.
+  function setBusy(busy) {
+    $$("[data-run-btn]").forEach((b) => { b.disabled = busy; b.title = busy ? "Espere a execução atual terminar" : b.dataset.cmd; });
+  }
+
+  function setState(state) {
+    // Switching the mockup state starts from a clean slate: no run of the selection, nothing selected.
+    stopRun();
+    sel.clear();
+    document.body.dataset.state = state;
+    $$("[data-in]").forEach((el) => { el.hidden = !el.dataset.in.split(" ").includes(state); });
+    $$("[data-set-state]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.setState === state)));
+    // The browser is open only in the main state; elsewhere it is one line.
+    setOpen($("#browser-toggle"), state === "fail");
+    setBusy(state === "run-all" || state === "run-one");
+    $$(".menu").forEach((m) => { m.hidden = true; });
+    render();
+  }
+  $$("[data-run-btn]").forEach((b) => { b.dataset.cmd = b.title; });
+
+  // ---------- multi-selection ----------
+  // Every checkbox carries a key "package|test|subtest"; the card and the tree row of the same test share it,
+  // so they stay in sync. A key ending in "|*" stands for rows the mockup does not list ("Mostrar os outros…"),
+  // and data-count says how many tests a key holds when it is more than one. Only leaf keys are stored.
+  const sel = new Set();
+  const boxes = $$(".selbox");
+  const keys = [...new Set($$("[data-key]").map((e) => e.dataset.key))];
+  const weight = Object.fromEntries($$("[data-count]").map((e) => [e.dataset.key, Number(e.dataset.count)]));
+  const isLeaf = (k) => !keys.some((o) => o.startsWith(k + "|"));
+  const leavesUnder = (k) => keys.filter((o) => (o === k || o.startsWith(k + "|")) && isLeaf(o));
+  const parentOf = (k) => k.slice(0, k.lastIndexOf("|"));
+  const childrenOf = (k) => keys.filter((o) => o.includes("|") && parentOf(o) === k);
+  function stateOf(k) {
+    const under = leavesUnder(k), on = under.filter((l) => sel.has(l)).length;
+    return on === 0 ? "none" : on === under.length ? "all" : "some";
+  }
+
+  // Count rule: a test selected whole counts once, whatever its subtests. Subtests count on their own
+  // only when their test is partly selected, because then they are what runs. A package with no
+  // listed tests counts all of its tests.
+  function counted() {
+    let tests = 0, subs = 0;
+    keys.forEach((k) => {
+      const depth = k.split("|").length, w = weight[k] || 1;
+      if (depth === 1 && isLeaf(k) && sel.has(k)) tests += w;
+      if (depth === 2 && stateOf(k) === "all") tests += w;
+      if (depth === 3 && sel.has(k) && stateOf(parentOf(k)) === "some") subs += w;
+    });
+    const n = (v, one, many) => `${v.toLocaleString("pt-BR")} ${v === 1 ? one : many}`;
+    const text = [tests && n(tests, "teste", "testes"), subs && n(subs, "subteste", "subtestes")].filter(Boolean).join(" e ");
+    return { text, total: tests + subs };
+  }
+
+  // One go test per package. Go cannot give each test its own subtest pattern in a single -run,
+  // so a test with only some subtests selected gets a line of its own.
+  const goName = (k) => k.split("|").pop().replace(/ /g, "_").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const alt = (ks) => (ks.length === 1 ? `^${goName(ks[0])}$` : `^(${ks.map(goName).join("|")})$`);
+  function split(k) {
+    const kids = childrenOf(k), rest = kids.find((c) => c.endsWith("|*"));
+    const named = kids.filter((c) => c !== rest);
+    return { restOn: Boolean(rest) && sel.has(rest), on: named.filter((c) => stateOf(c) === "all"), off: named.filter((c) => stateOf(c) !== "all") };
+  }
+  function commands() {
+    const lines = [];
+    keys.filter((k) => !k.includes("|") && stateOf(k) !== "none").forEach((pkg) => {
+      const go = (flags) => lines.push(`go test -race ${flags}./${pkg}`);
+      if (stateOf(pkg) === "all") return go("");
+      // With the unlisted rest selected, saying what to skip is shorter than naming what to run.
+      const { restOn, on, off } = split(pkg);
+      if (restOn) go(`-skip '${alt(off)}' `);
+      else if (on.length) go(`-run '${alt(on)}' `);
+      off.filter((t) => stateOf(t) === "some").forEach((t) => {
+        const s = split(t);
+        go(s.restOn ? `-run '${alt([t])}' -skip '${alt([t])}/${alt(s.off)}' ` : `-run '${alt([t])}/${alt(s.on)}' `);
+      });
+    });
+    return lines;
+  }
+
+  const bar = $("#selbar"), runBtn = $("#sel-run");
+  let lastBox = null, run = null;
+
+  function render() {
+    boxes.forEach((b) => {
+      const s = stateOf(b.dataset.key);
+      b.checked = s === "all";
+      b.indeterminate = s === "some";
+      b.disabled = Boolean(run);
+    });
+    $("#sel-failed").disabled = Boolean(run);
+    bar.hidden = sel.size === 0;
+    document.body.classList.toggle("has-sel", sel.size > 0);
+    if (!sel.size) return;
+    const { text, total } = counted();
+    $("#sel-msg").textContent = run ? `Executando ${text}…` : `${text} ${total === 1 ? "selecionado" : "selecionados"}`;
+    ["#sel-spin", "#sel-el", "#sel-cancel"].forEach((s) => { $(s).hidden = !run; });
+    ["#sel-clear", "#sel-run"].forEach((s) => { $(s).hidden = Boolean(run); });
+    const busy = document.body.dataset.state === "run-one";
+    runBtn.disabled = busy;
+    runBtn.title = busy ? "Espere a execução atual terminar" : `Uma execução de go test por pacote:\n${commands().join("\n")}`;
+  }
+
+  // Fake run of the selection: the selected rows and cards spin for about 2 s, then the results come back.
+  const durOf = (row) => $(".du, .fdur, small", row);
+  function showElapsed() {
+    const t = `0:${String(run.seconds).padStart(2, "0")}`;
+    $("#sel-el").textContent = t;
+    run.rows.forEach((row) => { durOf(row).textContent = t; });
+  }
+  function startRun() {
+    const rows = boxes.filter((b) => b.checked || b.indeterminate).map((b) => b.closest(".trow, .sub, .fhead"));
+    rows.forEach((row) => {
+      const mark = $(".o", row);
+      mark.insertAdjacentHTML("beforebegin", '<span class="spin" data-runspin aria-hidden="true"></span>');
+      mark.hidden = true;
+      durOf(row).dataset.was = durOf(row).textContent;
+    });
+    run = { rows, seconds: 0, timer: setInterval(() => { run.seconds += 1; run.seconds >= 2 ? stopRun() : showElapsed(); }, 1000) };
+    setBusy(true);
+    showElapsed();
+    render();
+    $("#sel-cancel").focus();
+  }
+  function stopRun() {
+    if (!run) return;
+    clearInterval(run.timer);
+    run.rows.forEach((row) => {
+      $("[data-runspin]", row).remove();
+      $(".o", row).hidden = false;
+      durOf(row).textContent = durOf(row).dataset.was;
+    });
+    const hadFocus = bar.contains(document.activeElement);
+    run = null;
+    setBusy(false);
+    render();
+    if (hadFocus) runBtn.focus();
+  }
+
+  // Checking a parent checks everything under it; the parents' state is derived in render().
+  document.addEventListener("change", (event) => {
+    const box = event.target.closest(".selbox");
+    if (!box) return;
+    lastBox = box;
+    leavesUnder(box.dataset.key).forEach((l) => (box.checked ? sel.add(l) : sel.delete(l)));
+    render();
+  });
+  // Adds to the selection: the failed subtests (not their passing siblings) and the package that did not build.
+  $("#sel-failed").addEventListener("click", () => { $$("[data-failed]").forEach((e) => sel.add(e.dataset.key)); render(); });
+  $("#sel-clear").addEventListener("click", () => { sel.clear(); render(); (lastBox || $("#sel-failed")).focus(); });
+  runBtn.addEventListener("click", startRun);
+  $("#sel-cancel").addEventListener("click", stopRun);
+
+  document.addEventListener("click", (event) => {
+    const stateButton = event.target.closest("[data-set-state]");
+    if (stateButton) return setState(stateButton.dataset.setState);
+
+    const toggle = event.target.closest("[aria-expanded][aria-controls]");
+    if (toggle) {
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      if (toggle.getAttribute("aria-haspopup") === "menu") $$(".menu").forEach((m) => { m.hidden = true; });
+      setOpen(toggle, open);
+      return;
+    }
+    // Disclosure buttons in the tree without a target in the mockup: only flip the chevron.
+    const lone = event.target.closest(".tog[aria-expanded]");
+    if (lone) return lone.setAttribute("aria-expanded", String(lone.getAttribute("aria-expanded") !== "true"));
+
+    const chip = event.target.closest(".fchip");
+    if (chip) return chip.setAttribute("aria-pressed", String(chip.getAttribute("aria-pressed") !== "true"));
+
+    const item = event.target.closest("[role=menuitemcheckbox]");
+    if (item) {
+      const on = item.getAttribute("aria-checked") !== "true";
+      item.setAttribute("aria-checked", String(on));
+      $(".ck", item).textContent = on ? "✓" : "";
+      return;
+    }
+    const radio = event.target.closest("[role=menuitemradio]");
+    if (radio) {
+      $$("[role=menuitemradio]", radio.parentElement).forEach((r) => {
+        r.setAttribute("aria-checked", String(r === radio));
+        $(".ck", r).textContent = r === radio ? "✓" : "";
+      });
+      return;
+    }
+
+    const copy = event.target.closest("[data-copy]");
+    if (copy) {
+      const text = copy.textContent;
+      copy.textContent = "Copiado";
+      setTimeout(() => { copy.textContent = text; }, 1500);
+      return;
+    }
+
+    if (!event.target.closest(".menu")) $$(".menu").forEach((m) => {
+      if (!m.hidden) { m.hidden = true; $(`[aria-controls="${m.id}"]`).setAttribute("aria-expanded", "false"); }
+    });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    $$(".menu").forEach((m) => {
+      if (m.hidden) return;
+      m.hidden = true;
+      const trigger = $(`[aria-controls="${m.id}"]`);
+      trigger.setAttribute("aria-expanded", "false");
+      trigger.focus();
+    });
+  });
+
+  // "Explicar o erro" on the third card: one call, loading, then the answer.
+  $("#f3-explain").addEventListener("click", (event) => {
+    event.currentTarget.hidden = true;
+    $("#f3-loading").hidden = false;
+    setTimeout(() => {
+      $("#f3-loading").hidden = true;
+      $("#f3-answer").hidden = false;
+      $("#f3-answer").focus({ preventScroll: true });
+    }, 1800);
+  });
+
+  $("#theme").addEventListener("click", (event) => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme === "dark";
+    root.dataset.theme = dark ? "light" : "dark";
+    event.currentTarget.textContent = dark ? "Tema escuro" : "Tema claro";
+  });
+
+  setState("fail");
+</script>
+</body>
+</html>

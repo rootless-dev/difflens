@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DiffLens",
+  "version": "0.1.0",
+  "identifier": "dev.difflens.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "pnpm analyzers:build && pnpm dev",
+    "beforeBuildCommand": "pnpm analyzers:build && pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DiffLens",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "externalBin": ["binaries/difflens-analyzer-go"],
+    "resources": {
+      "../analyzers/python/requirements.txt": "analyzers/python/requirements.txt",
+      "../analyzers/python/difflens_analyzer/": "analyzers/python/difflens_analyzer/",
+      "../analyzers/jsts/package.json": "analyzers/jsts/package.json",
+      "../analyzers/jsts/package-lock.json": "analyzers/jsts/package-lock.json",
+      "../analyzers/jsts/src/": "analyzers/jsts/src/",
+      "../analyzers/rust/Cargo.toml": "analyzers/rust/Cargo.toml",
+      "../analyzers/rust/Cargo.lock": "analyzers/rust/Cargo.lock",
+      "../analyzers/rust/src/": "analyzers/rust/src/"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

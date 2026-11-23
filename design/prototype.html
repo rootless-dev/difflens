@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>DiffLens mockup v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg:#151925; --panel:#1a1f2e; --raised:#232a3d; --line:#2c344c; --text:#e7e9f2; --muted:#8d96ae; --faint:#5c6580;
+    --accent:#7ea6ff; --accent-soft:rgba(126,166,255,.14);
+    --add:#56cf97; --del:#f27d72; --mod:#e9b85c; --ai:#d992e0;
+    --add-bg:rgba(86,207,151,.11); --del-bg:rgba(242,125,114,.11); --mod-bg:rgba(233,184,92,.10); --ai-bg:rgba(217,146,224,.09);
+  }
+  :root[data-theme="light"] {
+    --bg:#eceff5; --panel:#f7f8fb; --raised:#ffffff; --line:#d8ddea; --text:#1b2132; --muted:#5d6780; --faint:#98a1b7;
+    --accent:#2f5fd8; --accent-soft:rgba(47,95,216,.10);
+    --add:#12855a; --del:#c8402f; --mod:#a06c08; --ai:#9b3fa8;
+    --add-bg:rgba(18,133,90,.10); --del-bg:rgba(200,64,47,.09); --mod-bg:rgba(160,108,8,.09); --ai-bg:rgba(155,63,168,.07);
+  }
+  * { box-sizing:border-box; margin:0; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  html, body { height:100%; }
+  body { font:13px/1.45 "IBM Plex Sans", system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden; }
+  code, .mono { font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:12px; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* top bar */
+  .bar { display:flex; align-items:center; gap:14px; height:46px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); flex:none; }
+  .logo { display:flex; align-items:center; gap:8px; font-weight:600; letter-spacing:-.01em; }
+  .logo svg { display:block; }
+  .crumb { display:flex; align-items:center; gap:8px; color:var(--muted); }
+  .crumb button { padding:4px 8px; border-radius:6px; color:var(--text); font-weight:500; }
+  .crumb button:hover { background:var(--raised); }
+  .compare { display:flex; align-items:center; gap:6px; padding:4px 10px; border:1px solid var(--line); border-radius:6px; background:var(--raised); }
+  .compare .into { color:var(--faint); }
+  .stat { color:var(--muted); }
+  .stat .a { color:var(--add); } .stat .d { color:var(--del); }
+  .spacer { flex:1; }
+  .ghost { padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); }
+  .ghost:hover { color:var(--text); border-color:var(--faint); }
+
+  /* tabs */
+  .tabs { display:flex; gap:4px; padding:0 12px; background:var(--panel); border-bottom:1px solid var(--line); flex:none; }
+  .tab { padding:10px 12px 9px; color:var(--muted); border-bottom:2px solid transparent; font-weight:500; }
+  .tab:hover { color:var(--text); }
+  .tab[aria-selected="true"] { color:var(--text); border-color:var(--accent); }
+  .count { margin-left:6px; padding:0 6px; border-radius:9px; font-size:11px; background:var(--del-bg); color:var(--del); }
+  .count.ai { background:var(--ai-bg); color:var(--ai); }
+
+  /* layout */
+  .work { flex:1; display:grid; grid-template-columns:232px minmax(0,1fr) 324px; min-height:0; }
+  .left, .right { background:var(--panel); overflow:auto; padding:14px 12px; }
+  .left { border-right:1px solid var(--line); }
+  .right { border-left:1px solid var(--line); padding:16px; }
+  .center { min-width:0; display:flex; flex-direction:column; min-height:0; }
+  .group { color:var(--faint); font-size:12px; margin:16px 8px 6px; }
+  .group:first-child { margin-top:2px; }
+  .row { display:flex; align-items:center; gap:8px; width:100%; padding:6px 8px; border-radius:6px; text-align:left; }
+  .row:hover { background:var(--raised); }
+  .row.on { background:var(--accent-soft); }
+  .row .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .meta { color:var(--faint); font-size:12px; }
+  .dot { width:8px; height:8px; border-radius:2px; flex:none; }
+  .dot.new { background:var(--add); } .dot.mod { background:var(--mod); } .dot.same { background:var(--faint); }
+
+  .tools { display:flex; align-items:center; gap:14px; padding:10px 16px; border-bottom:1px solid var(--line); flex:none; }
+  .seg { display:inline-flex; padding:2px; border-radius:7px; background:var(--panel); border:1px solid var(--line); }
+  .seg button { padding:3px 11px; border-radius:5px; color:var(--muted); }
+  .seg button[aria-pressed="true"] { background:var(--raised); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  .legend { display:flex; gap:14px; color:var(--muted); font-size:12px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+
+  /* flow */
+  .canvas { flex:1; min-height:0; padding:8px 16px 16px; overflow:auto; background-image:radial-gradient(var(--line) 1px, transparent 1px); background-size:22px 22px; }
+  .canvas svg { width:100%; height:100%; min-height:380px; display:block; }
+  .lane { fill:var(--panel); stroke:var(--line); }
+  .lane-title { fill:var(--muted); font:500 12px "IBM Plex Sans", sans-serif; }
+  .edge { fill:none; stroke:var(--faint); stroke-width:1.4; }
+  .edge.hot { stroke:var(--accent); stroke-width:1.8; }
+  .step circle { fill:var(--bg); stroke:var(--faint); }
+  .step.hot circle { stroke:var(--accent); }
+  .step text { fill:var(--muted); font:500 10px "IBM Plex Sans", sans-serif; text-anchor:middle; }
+  .node rect.body { fill:var(--raised); stroke:var(--line); }
+  .node.sel rect.body { stroke:var(--accent); stroke-width:2; }
+  .node rect.state { fill:var(--faint); }
+  .node.new rect.state { fill:var(--add); } .node.mod rect.state { fill:var(--mod); }
+  .node.same { opacity:.6; }
+  .node .fn { fill:var(--text); font:500 11.5px "IBM Plex Mono", monospace; }
+  .node .pkg { fill:var(--muted); font:11px "IBM Plex Sans", sans-serif; }
+  .node .plus { fill:var(--add); font:11px "IBM Plex Mono", monospace; }
+  .node .minus { fill:var(--del); font:11px "IBM Plex Mono", monospace; }
+  .node .track { fill:var(--line); } .node .cov { fill:var(--add); } .node .cov.low { fill:var(--del); } .node .cov.mid { fill:var(--mod); }
+  .node .flag { fill:var(--ai); }
+  .node { cursor:pointer; }
+
+  .canvas { position:relative; }
+  #graph .node, #graph .edge, #graph .step { transition:opacity .15s; }
+  #graph.focus .node:not(.sel) { opacity:.3; } #graph.focus .edge, #graph.focus .step { opacity:.25; }
+  .pop { position:absolute; width:460px; background:var(--panel); border:1px solid var(--faint); border-radius:12px; box-shadow:0 28px 70px rgba(0,0,0,.5); z-index:5; }
+  .pop::before { content:""; position:absolute; top:calc(var(--caret) - 6px); width:12px; height:12px; background:var(--panel); border:1px solid var(--faint); transform:rotate(45deg); }
+  .pop[data-side="right"]::before { left:-7px; border-right:0; border-top:0; }
+  .pop[data-side="left"]::before { right:-7px; border-left:0; border-bottom:0; }
+  .pop header { padding:16px 18px 14px; border-bottom:1px solid var(--line); }
+  .pop footer .godiff { padding:6px 12px; border-radius:7px; background:var(--accent); color:var(--bg); font-weight:500; font-size:13px; }
+  .pop footer .godiff:hover { text-decoration:none; filter:brightness(1.08); }
+  .ptitle { display:flex; align-items:center; gap:10px; }
+  .ptitle code { flex:1; font-size:15px; font-weight:500; letter-spacing:-.01em; }
+  .pop .x { color:var(--muted); width:24px; height:24px; border-radius:6px; } .pop .x:hover { color:var(--text); background:var(--raised); }
+  .pmeta { display:flex; align-items:center; gap:8px; margin-top:5px; color:var(--muted); font-size:12px; }
+  .pmeta code { margin-left:auto; color:var(--faint); }
+  .ptabs { display:flex; gap:4px; margin:12px 0 -1px -8px; }
+  .ptabs button { padding:7px 10px 8px; color:var(--muted); font-weight:500; border-bottom:2px solid transparent; }
+  .ptabs button:hover { color:var(--text); }
+  .ptabs button[aria-selected="true"] { color:var(--text); border-color:var(--accent); }
+  .pbody { padding:16px 18px 18px; }
+  .plead { font-size:14.5px; line-height:1.55; }
+  .pop h4 { font-size:12px; font-weight:500; color:var(--muted); margin:18px 0 8px; }
+  .pop ul { list-style:none; padding:0; display:grid; gap:8px; }
+  .pop li { display:grid; grid-template-columns:14px 1fr; gap:8px; }
+  .pop li::before { content:""; width:6px; height:6px; margin-top:7px; border-radius:1.5px; background:var(--accent); }
+  .pop .quiet { color:var(--muted); }
+  .pdiff { background:var(--bg); max-height:300px; min-height:190px; overflow:auto; padding:8px 0; }
+  .pdiff .ln { grid-template-columns:44px 1fr; } .pdiff .quiet { padding:14px 18px; }
+  .pop footer { display:flex; justify-content:space-between; align-items:center; padding:10px 18px; border-top:1px solid var(--line); color:var(--faint); font-size:12px; }
+  .pop footer em { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; margin-right:4px; }
+  .pop footer button { color:var(--accent); } .pop footer button:hover { text-decoration:underline; }
+
+  /* inspector */
+  .right h2 { font:500 14px "IBM Plex Mono", monospace; letter-spacing:-.01em; }
+  .where { color:var(--muted); margin:2px 0 14px; }
+  .sect { margin-top:18px; padding-top:14px; border-top:1px solid var(--line); }
+  .sect h3 { font-size:12px; font-weight:500; color:var(--muted); margin-bottom:8px; }
+  .says { color:var(--text); }
+  .measure { display:grid; grid-template-columns:1fr auto; gap:7px 12px; }
+  .measure dt { color:var(--muted); } .measure dd { font-family:"IBM Plex Mono", monospace; font-size:12px; text-align:right; }
+  .ok { color:var(--add); } .warn { color:var(--mod); } .bad { color:var(--del); }
+  .finding { padding:9px 10px; border-radius:6px; background:var(--ai-bg); border-left:2px solid var(--ai); margin-bottom:8px; }
+  .finding strong { display:block; font-weight:500; margin-bottom:2px; }
+  .finding p { color:var(--muted); }
+  .finding .at { color:var(--ai); font-size:12px; margin-top:4px; display:inline-block; }
+
+  /* diff */
+  .diff { flex:1; min-height:0; overflow:auto; padding:0 0 16px; }
+  .file { position:sticky; top:0; display:flex; gap:10px; align-items:center; padding:8px 16px; background:var(--bg); border-bottom:1px solid var(--line); }
+  .ln { display:grid; grid-template-columns:44px 44px 1fr; font:12px/1.65 "IBM Plex Mono", monospace; white-space:pre; }
+  .ln i { font-style:normal; color:var(--faint); text-align:right; padding-right:10px; user-select:none; }
+  .ln.add { background:var(--add-bg); } .ln.add span::before { content:"+ "; color:var(--add); }
+  .ln.del { background:var(--del-bg); } .ln.del span::before { content:"− "; color:var(--del); }
+  .ln.ctx span::before, .ln.far span::before { content:"  "; }
+  .ln.far { color:var(--muted); }
+  .diff.changes-only .ln.far { display:none; }
+  .fold { padding:3px 16px 3px 98px; color:var(--faint); font-size:12px; background:var(--panel); border-block:1px solid var(--line); display:none; }
+  .diff.changes-only .fold { display:block; }
+  .note { margin:6px 16px 6px 98px; }
+
+  /* projects */
+  .projects { flex:1; overflow:auto; padding:40px max(24px, calc(50% - 440px)); }
+  .projects h1 { font-size:22px; font-weight:600; letter-spacing:-.02em; }
+  .projects .sub { color:var(--muted); margin:4px 0 22px; }
+  .actions { display:flex; gap:10px; margin-bottom:22px; }
+  .primary { padding:8px 14px; border-radius:7px; background:var(--accent); color:var(--bg); font-weight:500; }
+  .secondary { padding:8px 14px; border-radius:7px; border:1px solid var(--line); background:var(--raised); }
+  .plist { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel); }
+  .p { display:grid; grid-template-columns:1.3fr 1.4fr 92px 190px 130px; gap:16px; align-items:center; width:100%; text-align:left; padding:13px 16px; border-top:1px solid var(--line); }
+  .p:first-child { border-top:0; }
+  .p:hover { background:var(--raised); }
+  .p .pn { font-weight:500; } .p .pp, .p .when { color:var(--muted); }
+  .p .pp { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip { justify-self:start; padding:1px 8px; border-radius:10px; border:1px solid var(--line); color:var(--muted); font-size:12px; }
+  .wait { color:var(--mod); }
+  /* card links, analysis state, review progress */
+  em.t-ai, em.t-m { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; }
+  .ext { display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border:1px solid var(--line); border-radius:6px; color:var(--text); text-decoration:none; font-size:12px; white-space:nowrap; }
+  .ext:hover { border-color:var(--accent); color:var(--accent); }
+  .analysis { display:flex; align-items:center; gap:8px; padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .analysis i { width:8px; height:8px; border-radius:50%; background:var(--add); } .analysis b { font-weight:500; color:var(--add); }
+  .analysis.stale i { background:var(--mod); } .analysis.stale b { color:var(--mod); }
+  .stalebar { display:flex; align-items:center; gap:22px; padding:8px 16px; background:var(--mod-bg); border-bottom:1px solid var(--line); flex:none; }
+  .stalebar strong { font-weight:500; color:var(--mod); } .stalebar span { color:var(--muted); } .stalebar span b { font-weight:500; color:var(--text); margin-right:4px; }
+  .stalebar .primary { margin-left:auto; padding:5px 12px; }
+  .progress { margin-left:auto; display:flex; align-items:center; gap:10px; color:var(--muted); font-size:12px; }
+  .progress b { color:var(--text); font-weight:500; } .progress .cbar { width:84px; } .progress span:last-child { margin-left:10px; }
+  .legend { flex-wrap:wrap; } .lg-tick { color:var(--add); } .lg-re { fill:none; stroke:var(--accent); stroke-width:1.6; stroke-dasharray:2.5 2; }
+  .node .tick { display:none; fill:var(--add); font:600 12px "IBM Plex Sans", sans-serif; } .node.reviewed .tick { display:inline; }
+  .node .reop { display:none; fill:none; stroke:var(--accent); stroke-width:1.6; stroke-dasharray:2.5 2; } .node.reopened .reop { display:inline; }
+  .node .tick circle { fill:var(--bg); stroke:var(--add); stroke-width:1.4; } .node .tick text { text-anchor:middle; font-size:10px; }
+  .node .reop { fill:var(--bg); stroke-width:2; }
+  .edge.cond { stroke-dasharray:6 4; } .step.cond circle { stroke-dasharray:3 2; }
+  .tools { flex-wrap:wrap; row-gap:8px; } .calls-legend { flex-basis:100%; }
+  .lg-e { fill:none; stroke:var(--muted); stroke-width:1.6; } .lg-e.cond { stroke-dasharray:6 4; } .lg-e.async { stroke-dasharray:1.5 3.5; stroke-linecap:round; }
+  .calls { padding-left:18px; display:grid; gap:7px; color:var(--faint); } .calls li span { display:block; color:var(--muted); font-size:12px; } .calls code { color:var(--text); }
+  .v.unk { background:var(--raised); color:var(--muted); }
+  .pacts { display:flex; align-items:center; gap:14px; } .pop footer button { white-space:nowrap; }
+
+  /* card and acceptance criteria */
+  .overview h2 { display:flex; align-items:center; gap:8px; }
+  .tally { color:var(--faint); font-weight:400; }
+  .ticket { border:1px solid var(--line); border-radius:10px; padding:16px 18px; background:var(--panel); display:grid; gap:10px; }
+  .thead { display:flex; align-items:center; gap:8px; } .thead h3 { flex:1; font-size:15px; font-weight:500; }
+  .ticket p { max-width:66ch; } .ticket .hint { margin:0; }
+  .crit { list-style:none; padding:0; border-top:1px solid var(--line); }
+  .crit li { display:grid; grid-template-columns:84px 1fr; gap:14px; padding:12px 8px; border-bottom:1px solid var(--line); }
+  .crit strong { display:block; font-weight:500; font-size:14px; } .crit div span { color:var(--muted); }
+  .v { font-style:normal; font-size:11px; padding:1px 0; border-radius:9px; text-align:center; align-self:start; margin-top:2px; }
+  .v.met { background:var(--add-bg); color:var(--add); } .v.part { background:var(--mod-bg); color:var(--mod); } .v.not { background:var(--del-bg); color:var(--del); }
+  .sincebox { border-left:2px solid var(--accent); padding-left:14px; display:grid; gap:10px; justify-items:start; }
+
+  /* review state in the diff */
+  .row .mark { font-size:11px; color:var(--add); } .row .mark.re { color:var(--accent); background:var(--accent-soft); padding:0 6px; border-radius:9px; }
+  .rvbtn { margin-left:auto; padding:4px 10px; border:1px solid var(--line); border-radius:6px; font-size:12px; color:var(--muted); }
+  .rvbtn:hover { color:var(--text); } .rvbtn.done { color:var(--add); border-color:var(--add); } .rvbtn.re { color:var(--accent); border-color:var(--accent); }
+  .tip { margin:0 0 0 auto; }
+  .ln { cursor:pointer; } .ln:hover { filter:brightness(1.18); }
+  .ln.since { box-shadow:inset 3px 0 0 var(--accent); }
+  .diff.since-only .ln:not(.since), .diff.since-only .fold, .diff.since-only .finding { display:none; }
+  .nosince { display:none; padding:18px 16px 18px 98px; color:var(--muted); } .diff.since-only .nosince { display:block; }
+  .cmt { margin:6px 16px 8px 98px; max-width:640px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); }
+  .cmt .who { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; margin-bottom:3px; } .cmt .who b { color:var(--text); font-weight:500; }
+  .cmt .old { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; background:var(--accent-soft); color:var(--accent); }
+  .cmt .acts { display:flex; gap:14px; margin-top:7px; } .cmt .acts button { color:var(--accent); font-size:12px; }
+  .cmt textarea { width:100%; min-height:56px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font:inherit; resize:vertical; }
+
+  /* finding verdicts */
+  #insights .ins { grid-template-columns:62px 1fr auto; }
+  .st { font-style:normal; font-size:11px; padding:1px 9px; border-radius:9px; align-self:center; }
+  .st.confirmed { background:var(--accent-soft); color:var(--accent); } .st.dismissed { background:var(--raised); color:var(--faint); }
+  .st.pending { border:1px dashed var(--faint); color:var(--muted); }
+  .ins.gone strong { color:var(--muted); text-decoration:line-through; }
+  .recheck { margin:14px 0 0; padding:8px 10px; border-radius:6px; background:var(--accent-soft); color:var(--accent); }
+
+  /* overview */
+  .overview { flex:1; overflow:auto; padding:36px max(28px, calc(50% - 540px)) 48px; display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:56px; align-content:start; }
+  .overview h1 { font-size:22px; font-weight:600; letter-spacing:-.02em; }
+  .overview .lead { font-size:15px; line-height:1.6; max-width:64ch; margin-top:10px; }
+  .overview h2 { font-size:13px; font-weight:500; color:var(--muted); margin:34px 0 10px; }
+  .overview h2.first { margin-top:6px; }
+  .look { list-style:none; padding:0; border-top:1px solid var(--line); }
+  .look li { border-bottom:1px solid var(--line); }
+  .look button { display:grid; grid-template-columns:28px 1fr auto; gap:10px; align-items:start; width:100%; text-align:left; padding:13px 8px; border-radius:6px; }
+  .look button:hover { background:var(--panel); }
+  .look .rank { color:var(--faint); font:500 13px "IBM Plex Mono", monospace; padding-top:1px; }
+  .look .what { display:grid; gap:3px; }
+  .look .what strong { font-weight:500; font-size:14px; }
+  .look .what > span { color:var(--muted); }
+  .look .tags { display:flex; gap:8px; align-items:center; margin-top:3px; }
+  .look .tags em { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; }
+  .t-ai { background:var(--ai-bg); color:var(--ai); } .t-m { background:var(--accent-soft); color:var(--accent); }
+  .look .dest { color:var(--accent); font-size:12px; padding-top:2px; visibility:hidden; }
+  .look button:hover .dest, .look button:focus-visible .dest { visibility:visible; }
+  .plain { padding-left:18px; color:var(--muted); display:grid; gap:6px; }
+  .score { display:grid; gap:0; border-top:1px solid var(--line); }
+  .score dt { color:var(--muted); padding-top:12px; }
+  .score dd { padding:2px 0 12px; border-bottom:1px solid var(--line); font-size:17px; }
+  .score dd b { font-weight:500; } .score dd small { display:block; font-size:12px; color:var(--faint); margin-top:1px; }
+  .shape { display:grid; grid-template-columns:1fr auto; gap:9px 16px; padding-top:12px; border-top:1px solid var(--line); }
+  .shape dt { color:var(--muted); } .shape dd { text-align:right; }
+  /* tests, quality, insights */
+  .page { flex:1; overflow:auto; padding:28px max(28px, calc(50% - 600px)) 48px; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:8px 52px; align-content:start; }
+  .page h1 { font-size:18px; font-weight:600; letter-spacing:-.01em; }
+  .page h2 { font-size:13px; font-weight:500; color:var(--muted); margin:30px 0 10px; display:flex; gap:8px; align-items:center; }
+  .page h2.first { margin-top:6px; }
+  .page h2 em { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; }
+  .page p { max-width:64ch; }
+  .hint { color:var(--faint); font-size:12px; margin-top:8px; }
+  .strip { grid-column:1 / -1; display:flex; gap:44px; padding-bottom:18px; margin-bottom:14px; border-bottom:1px solid var(--line); }
+  .strip b { display:block; font-size:24px; font-weight:500; letter-spacing:-.02em; }
+  .strip span { color:var(--muted); }
+  .tgroup { display:flex; justify-content:space-between; padding:14px 8px 6px; border-top:1px solid var(--line); color:var(--faint); font-size:12px; }
+  .tgroup:first-of-type { border-top:0; padding-top:2px; }
+  .tgroup code { color:var(--text); font-weight:500; }
+  .t { display:grid; grid-template-columns:18px 1fr auto 44px; gap:8px; align-items:center; width:100%; text-align:left; padding:6px 8px; border-radius:6px; }
+  .t:hover { background:var(--panel); } .t.on { background:var(--del-bg); }
+  .t i { font-style:normal; font-size:12px; } .t small { color:var(--faint); text-align:right; }
+  .t em { font-style:normal; font-size:11px; padding:0 7px; border-radius:9px; background:var(--add-bg); color:var(--add); }
+  .t em.mod { background:var(--mod-bg); color:var(--mod); }
+  .more { margin-top:14px; padding:8px; color:var(--muted); border-top:1px solid var(--line); width:100%; text-align:left; }
+  .more:hover { color:var(--text); }
+  .codeblock { font:12px/1.7 "IBM Plex Mono", monospace; white-space:pre; overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:8px 0; margin:10px 0 12px; }
+  .codeblock div { padding:0 12px; } .codeblock .hl { background:var(--del-bg); }
+  .covs { display:grid; grid-template-columns:auto 1fr 36px; gap:9px 12px; align-items:center; }
+  .covs span { text-align:right; font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--muted); }
+  .cbar { height:5px; border-radius:3px; background:var(--line); overflow:hidden; }
+  .cbar i { display:block; height:100%; background:var(--add); } .cbar.mid i { background:var(--mod); } .cbar.low i { background:var(--del); }
+  .qt { display:grid; grid-template-columns:1fr 96px 96px 76px 96px; gap:12px; align-items:center; width:100%; text-align:right; padding:9px 8px; border-bottom:1px solid var(--line); font-family:"IBM Plex Mono", monospace; font-size:12px; }
+  .qt code { text-align:left; } .qt.on { background:var(--accent-soft); }
+  button.qt:hover { background:var(--panel); }
+  .qt.head { font-family:inherit; color:var(--muted); align-items:end; }
+  .qt.head span:first-child { text-align:left; } .qt.head small { display:block; color:var(--faint); font-size:11px; }
+  .crossed { list-style:none; padding:0; border-top:1px solid var(--line); }
+  .crossed li { padding:11px 0 11px 12px; border-bottom:1px solid var(--line); border-left:2px solid var(--del); display:grid; gap:2px; margin-top:-1px; }
+  .crossed strong { font-weight:500; } .crossed span { color:var(--muted); }
+  .filters { display:flex; align-items:center; gap:14px; margin-bottom:12px; } .filters .hint { margin:0; }
+  .ins { display:grid; grid-template-columns:62px 1fr; gap:12px; align-items:start; width:100%; text-align:left; padding:12px 8px; border-bottom:1px solid var(--line); border-radius:6px; }
+  .ins:hover { background:var(--panel); } .ins.on { background:var(--ai-bg); }
+  .ins strong { display:block; font-weight:500; font-size:14px; } .ins small { color:var(--muted); font-size:12px; display:flex; gap:8px; margin-top:2px; }
+  .sev { font-style:normal; font-size:11px; padding:1px 0; border-radius:9px; text-align:center; margin-top:2px; }
+  .sev.high { background:var(--del-bg); color:var(--del); } .sev.med { background:var(--mod-bg); color:var(--mod); } .sev.low { background:var(--raised); color:var(--muted); }
+  .detail { border-left:1px solid var(--line); padding-left:28px; }
+  .detail .actions { margin:26px 0 0; flex-wrap:wrap; }
+  /* run the branch, and where each step runs */
+  .runbar { grid-column:1 / -1; display:flex; align-items:center; gap:16px; padding-bottom:18px; margin-bottom:14px; border-bottom:1px solid var(--line); }
+  .runbar .primary { padding:9px 16px; white-space:nowrap; }
+  .runbar .primary.stop { background:var(--raised); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  .runstate { flex:1; display:grid; gap:2px; } .runstate strong { font-size:15px; font-weight:500; } .runstate span { color:var(--muted); }
+  #run.up .runstate strong { color:var(--add); }
+  #run:not(.up) .live, #run.up .idle { display:none; }
+  .iso { font-size:11px; padding:1px 9px; border-radius:9px; border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
+  .svc { display:grid; grid-template-columns:8px 84px 1fr auto; gap:12px; align-items:baseline; padding:10px 8px; border-bottom:1px solid var(--line); }
+  .svc i { width:8px; height:8px; border-radius:50%; background:var(--faint); align-self:center; } #run.up .svc i { background:var(--add); }
+  .svc span { color:var(--muted); } .svc b { font-weight:400; font-size:12px; color:var(--faint); } #run.up .svc b { color:var(--add); }
+  .rq { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; width:100%; text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); border-radius:6px; }
+  .rq:hover { background:var(--panel); } .rq.on { background:var(--accent-soft); }
+  .rq strong { display:block; font-weight:500; } .rq small { color:var(--muted); font-size:12px; }
+  .rq em { font-style:normal; font-size:11px; padding:1px 9px; border-radius:9px; background:var(--add-bg); color:var(--add); } .rq em.bad { background:var(--del-bg); color:var(--del); }
+  .rqhead { display:flex; align-items:center; gap:10px; margin-top:16px; } .rqhead code { flex:1; }
+  .verb { font:500 11px "IBM Plex Mono", monospace; color:var(--accent); }
+  .observed { margin:0; padding:8px 10px; border-radius:6px; background:var(--add-bg); } .observed.bad { background:var(--del-bg); }
+  .logs { max-height:230px; color:var(--muted); }
+  .ranin { margin-left:auto; align-self:end; color:var(--muted); font-size:12px; } .ranin button { color:var(--accent); margin-left:6px; }
+  .projects h2 { font-size:13px; font-weight:500; color:var(--muted); margin:34px 0 10px; }
+  .stepr { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:12px 8px; border-bottom:1px solid var(--line); }
+  .stepr:first-of-type { border-top:1px solid var(--line); }
+  .stepr strong { display:block; font-weight:500; } .stepr span { color:var(--muted); }
+  .levels { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:16px; }
+  .level { border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:var(--panel); display:grid; gap:4px; align-content:start; }
+  .level strong { font-weight:500; } .level span { color:var(--muted); } .level small { color:var(--add); font-size:12px; margin-top:4px; }
+  .form { display:grid; grid-template-columns:150px 1fr; gap:10px 16px; align-items:center; }
+  .form dt { color:var(--muted); } .form dd { padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); font:12px "IBM Plex Mono", monospace; }
+  .back { color:var(--muted); margin:-16px 0 14px -2px; display:block; } .back:hover { color:var(--text); }
+  .savebar { position:sticky; bottom:-40px; display:flex; align-items:center; gap:10px; margin-top:28px; padding:14px 0 54px; background:var(--bg); border-top:1px solid var(--line); }
+  .savebar span { flex:1; color:var(--muted); } .savebar button:disabled { opacity:.45; cursor:default; }
+  .form .field, .form select { padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font:12px "IBM Plex Mono", monospace; }
+  .form select { width:100%; appearance:none; cursor:pointer; padding-right:30px; background-image:linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position:calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size:5px 5px; background-repeat:no-repeat; }
+  .form select:hover { border-color:var(--faint); } .form select:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .withbtn { display:flex; gap:8px; align-items:center; } .withbtn .field { flex:1; } .withbtn .secondary { padding:5px 12px; white-space:nowrap; }
+  .p.b { grid-template-columns:1.5fr 130px 150px 1.3fr 120px; } .p.off { opacity:.55; }
+  .phead { display:flex; align-items:start; gap:16px; } .phead > div { flex:1; } .phead .sub { margin-bottom:0; }
+  .clonebox { border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:16px 18px; margin-bottom:22px; }
+  .clonebox .actions { margin:14px 0 0; }
+  .iso.okk { color:var(--add); border-color:var(--add); } .secondary.danger { color:var(--del); }
+  .kinds { display:grid; grid-template-columns:repeat(6, 1fr); gap:10px; }
+  .kind { position:relative; aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; padding:10px 8px; border:1px solid var(--line); border-radius:10px; background:var(--panel); text-align:center; }
+  .kind:hover { border-color:var(--faint); }
+  .kind svg { margin-bottom:7px; fill:none; stroke:var(--muted); stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+  .kind strong { font-weight:500; } .kind small { color:var(--muted); font-size:11.5px; line-height:1.3; }
+  .kind em { position:absolute; top:7px; right:8px; font-style:normal; font-size:10px; color:var(--accent); }
+  .kind[aria-pressed="true"] { border-color:var(--accent); background:var(--accent-soft); } .kind[aria-pressed="true"] svg { stroke:var(--accent); }
+  .kindsays { margin-top:14px; grid-template-columns:150px 1fr; } .kindsays dd { text-align:left; }
+  .form dd.free { padding:0; border:0; background:none; font:inherit; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="var(--accent)" stroke-width="1.8"/><path d="M5.5 8.5h6M8.5 5.5v6" stroke="var(--add)" stroke-width="1.6" stroke-linecap="round"/><path d="M13 13l5 5" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/></svg>
+    DiffLens
+  </div>
+  <nav class="crumb" id="crumb">
+    <button data-go="projects">Projects</button><span class="pj">/</span><button class="pj" data-go="project">payments-api</button>
+    <span class="compare mono rv" id="compare"><span>feat/refund-flow</span><span class="into">into</span><span>main</span></span>
+    <span class="stat mono rv" id="stat">12 files <span class="a">+384</span> <span class="d">−57</span></span>
+    <a class="ext rv" href="#" title="Open the card in Jira">PAY-482<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 1.5h5v5M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></a>
+    <a class="ext rv" href="#" title="Open the pull request">PR #318<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 1.5h5v5M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="analysis rv stale" id="analysis" title="The commit or local state these results were computed from"><i></i><span id="an-text">Analyzed <code>e7f3b10</code>, 26 min ago</span><b id="an-flag">Out of date</b></div>
+  <button class="ghost rv" id="reanalyze">Analyze again</button>
+  <button class="ghost rv" data-go="settings">Project settings</button>
+  <button class="ghost" data-go="app">Preferences</button>
+  <button class="ghost" id="theme">Light theme</button>
+</header>
+
+<!-- PROJECTS -->
+<main class="projects" id="projects" hidden>
+  <h1>Projects</h1>
+  <p class="sub">Repositories DiffLens knows about on this machine.</p>
+  <div class="actions">
+    <button class="primary">Add local folder</button>
+    <button class="secondary" id="clone-open">Clone repository</button>
+  </div>
+  <div class="clonebox" id="clonebox" hidden>
+    <dl class="form">
+      <dt>Repository URL</dt><dd>git@bitbucket.org:acme/ledger-worker.git</dd>
+      <dt>Clone into</dt><dd class="free withbtn"><span class="field">~/work/ledger-worker</span><button class="secondary">Choose folder</button></dd>
+    </dl>
+    <p class="hint">Uses the git and SSH keys already set up on this machine. DiffLens stores no credentials.</p>
+    <div class="actions"><button class="primary">Clone and add</button><button class="secondary">Cancel</button></div>
+  </div>
+  <div class="plist">
+    <button class="p" data-go="project"><span class="pn">payments-api</span><span class="pp mono">~/work/payments-api</span><span class="chip">Go</span><span class="wait">2 branches to review</span><span class="when">Analyzed 4 min ago</span></button>
+    <button class="p" data-go="project"><span class="pn">ledger-worker</span><span class="pp mono">~/work/ledger-worker</span><span class="chip">Go</span><span class="wait">1 branch to review</span><span class="when">Analyzed yesterday</span></button>
+    <button class="p" data-go="project"><span class="pn">notifier</span><span class="pp mono">~/Desenvolvimento/notifier</span><span class="chip">Go</span><span class="when">Nothing to review</span><span class="when">Analyzed 6 days ago</span></button>
+    <div class="p off"><span class="pn">backoffice-web</span><span class="pp mono">~/work/backoffice-web</span><span class="chip">TypeScript</span><span class="when">Language not supported yet</span><span class="when">Diff only</span></div>
+  </div>
+</main>
+
+<!-- ONE PROJECT -->
+<main class="projects" id="project" hidden>
+  <button class="back" data-go="projects">← All projects</button>
+  <div class="phead">
+    <div><h1>payments-api</h1><p class="sub"><code>~/work/payments-api</code> · Go 1.23 · Backend API · compared with <code>main</code></p></div>
+    <button class="secondary" data-go="settings">Project settings</button>
+  </div>
+
+  <h2>Waiting for your review</h2>
+  <div class="plist">
+    <button class="p b" data-go="review"><span class="pn mono">feat/refund-flow</span><span class="when">PAY-482 · PR #318</span><span class="stat mono">12 files <span class="a">+384</span> <span class="d">−57</span></span><span class="wait">2 commits since your review</span><span class="when">Reviewed 5 of 12</span></button>
+    <button class="p b" data-go="review"><span class="pn mono">fix/settlement-rounding</span><span class="when">PAY-501</span><span class="stat mono">3 files <span class="a">+41</span> <span class="d">−12</span></span><span class="when">Not analyzed yet</span><span class="when">Not started</span></button>
+  </div>
+
+  <h2>Reviewed</h2>
+  <div class="plist">
+    <button class="p b" data-go="review"><span class="pn mono">chore/upgrade-pgx</span><span class="when">PAY-477 · PR #311</span><span class="stat mono">7 files <span class="a">+96</span> <span class="d">−88</span></span><span class="when">Merged on 9 Nov</span><span class="ok">Reviewed 7 of 7</span></button>
+  </div>
+
+  <h2>Review something else</h2>
+  <dl class="form">
+    <dt>Branch</dt><dd class="free"><select aria-label="Branch to review">
+      <option>feat/webhook-retries</option><option>feat/refund-flow</option><option>fix/settlement-rounding</option><option>chore/upgrade-pgx</option><option>Uncommitted changes in the working tree</option></select></dd>
+    <dt>Compare with</dt><dd class="free"><select aria-label="Branch to compare with">
+      <option>main</option><option>develop</option><option>release/2.4</option></select></dd>
+  </dl>
+  <p class="hint">Uncommitted changes in your working tree can be reviewed too, compared with the last commit.</p>
+  <div class="actions" style="margin-top:14px"><button class="primary">Analyze and review</button></div>
+</main>
+
+<!-- PREFERENCES -->
+<main class="projects" id="app" hidden>
+  <button class="back" data-go="projects">← Back to projects</button>
+  <h1>Preferences</h1>
+  <p class="sub">Apply to every project on this machine.</p>
+
+  <h2>Model</h2>
+  <div class="stepr"><div><strong>Who writes the summaries and findings</strong><span>Everything marked Model in a review comes from here.</span></div><div class="seg pick" id="model-pick"><button aria-pressed="true">Claude Code on this machine</button><button aria-pressed="false">API key</button></div></div>
+  <dl class="form" id="model-cli" style="margin-top:12px">
+    <dt>Command</dt><dd>claude, found in /opt/homebrew/bin</dd>
+    <dt>Signed in</dt><dd>Yes, uses the account Claude Code already has</dd>
+  </dl>
+  <dl class="form" id="model-api" style="margin-top:12px" hidden>
+    <dt>API key</dt><dd>•••••••••••••••• kept in the system keychain</dd>
+    <dt>Model</dt><dd>claude-opus-5-5</dd>
+  </dl>
+  <p class="hint">Sent to the model: the diff, the changed functions, what they call and the Jira card. Nothing else leaves this machine.</p>
+
+  <h2>Languages</h2>
+  <div class="stepr"><div><strong>Go</strong><span>go 1.23.4, found in <code>/usr/local/go/bin</code></span></div><span class="iso okk">Full analysis</span></div>
+  <div class="stepr"><div><strong>TypeScript, Python and others</strong><span>Not supported yet. Projects in these languages open with the diff and the model's reading only.</span></div><span class="iso">Diff only</span></div>
+
+  <h2>Connections</h2>
+  <div class="stepr"><div><strong>Jira</strong><span>acme.atlassian.net. Cards are found from the branch name, such as <code>PAY-482</code>.</span></div><button class="secondary">Disconnect</button></div>
+  <div class="stepr"><div><strong>Pull requests</strong><span>Bitbucket, through the <code>bkt</code> command already signed in on this machine. Read only.</span></div><span class="iso okk">Connected</span></div>
+
+  <h2>Running code</h2>
+  <div class="stepr"><div><strong>Sandbox</strong><span>Built into macOS.</span></div><span class="iso okk">Available</span></div>
+  <div class="stepr"><div><strong>Docker</strong><span>Needed for integration tests and the Run tab.</span></div><span class="iso okk">Running</span></div>
+  <div class="stepr"><div><strong>Analyses at the same time</strong><span>Mutation testing is the heavy one.</span></div><div class="seg pick"><button aria-pressed="false">1</button><button aria-pressed="true">2</button><button aria-pressed="false">4</button></div></div>
+  <div class="stepr"><div><strong>Copies of branches and saved results</strong><span><code>~/Library/Application Support/DiffLens</code>, 1.2 GB</span></div><button class="secondary">Clear</button></div>
+
+  <h2>Appearance</h2>
+  <div class="stepr"><div><strong>Theme</strong></div><div class="seg pick"><button aria-pressed="true">Dark</button><button aria-pressed="false">Light</button><button aria-pressed="false">Same as the system</button></div></div>
+
+  <div class="savebar" data-saved="Saved">
+    <span>No changes</span>
+    <button class="secondary" disabled>Discard</button>
+    <button class="primary" disabled>Save changes</button>
+  </div>
+</main>
+
+<!-- PROJECT SETTINGS -->
+<main class="projects" id="settings" hidden>
+  <button class="back" data-go="project">← Back to payments-api</button>
+  <h1>payments-api settings</h1>
+  <p class="sub">How DiffLens runs this project on this machine. Every step works on its own copy of the branch, never on your checkout.</p>
+
+  <h2>Kind of project</h2>
+  <div class="kinds pick" id="kinds"></div>
+  <dl class="shape kindsays" id="kind-says"></dl>
+
+  <h2 id="kind-title"></h2>
+  <dl class="form" id="kind-form"></dl>
+  <p class="hint" id="kind-hint"></p>
+
+  <h2>Where each step runs</h2>
+  <div class="stepr"><div><strong>Reading the code</strong><span>Diff, call graph, complexity, duplication. Does not execute project code.</span></div><span class="iso">Plain process</span></div>
+  <div class="stepr"><div><strong>Unit tests, coverage and race detector</strong><span>Executes project code.</span></div><div class="seg pick"><button aria-pressed="false">Plain process</button><button aria-pressed="true">Sandbox</button><button aria-pressed="false">Docker</button></div></div>
+  <div class="stepr"><div><strong>Mutation testing</strong><span>Executes project code many times, on modified copies.</span></div><div class="seg pick"><button aria-pressed="false">Plain process</button><button aria-pressed="true">Sandbox</button><button aria-pressed="false">Docker</button></div></div>
+  <div class="stepr"><div><strong>Tests that need a database or the network</strong><span>Selected by the build tag <code>integration</code>.</span></div><div class="seg pick"><button aria-pressed="false">Plain process</button><button aria-pressed="false">Sandbox</button><button aria-pressed="true">Docker</button></div></div>
+  <div class="stepr"><div><strong>Running the application</strong><span>Used by the Run tab.</span></div><div class="seg pick"><button aria-pressed="false">Plain process</button><button aria-pressed="false">Sandbox</button><button aria-pressed="true">Docker</button></div></div>
+
+  <div class="levels">
+    <div class="level"><strong>Plain process</strong><span>Runs as you, with everything you can reach. Fastest. For code you trust.</span><small>Available</small></div>
+    <div class="level"><strong>Sandbox</strong><span>No network. Can write only inside its own copy of the branch. Nothing to install.</span><small>Available</small></div>
+    <div class="level"><strong>Docker</strong><span>Own filesystem, network and services. Needed when the code talks to a database or has to stay up.</span><small>Docker is running</small></div>
+  </div>
+
+  <h2>Review rules</h2>
+  <dl class="form">
+    <dt>Compare with</dt><dd>main</dd>
+    <dt>Jira project</dt><dd>PAY</dd>
+    <dt>Complexity limit</dt><dd>10 per function</dd>
+    <dt>CRAP limit</dt><dd>30 per function</dd>
+    <dt>Coverage target</dt><dd>80% of changed lines</dd>
+    <dt>Left out</dt><dd>**/mock_*.go, **/*.pb.go</dd>
+  </dl>
+  <p class="hint">Limits decide what the Quality tab marks as crossed. Paths left out are not measured and not read by the model.</p>
+
+  <h2>Project</h2>
+  <div class="stepr"><div><strong>Folder</strong><span><code>~/work/payments-api</code>, Go, detected from <code>go.mod</code></span></div><button class="secondary">Show in Finder</button></div>
+  <div class="stepr"><div><strong>Remove from DiffLens</strong><span>Deletes the reviews, comments and saved results. The folder itself is not touched.</span></div><button class="secondary danger">Remove project</button></div>
+
+  <div class="savebar" data-saved="Saved. Applies from the next analysis.">
+    <span>No changes</span>
+    <button class="secondary" disabled>Discard</button>
+    <button class="primary" disabled>Save changes</button>
+  </div>
+</main>
+
+<!-- REVIEW -->
+<div class="tabs" id="tabs" role="tablist">
+  <button class="tab" role="tab" data-view="overview">Overview</button>
+  <button class="tab" role="tab" data-view="flow">Flow</button>
+  <button class="tab" role="tab" data-view="diff">Diff</button>
+  <button class="tab" role="tab" data-view="tests">Tests<span class="count">1</span></button>
+  <button class="tab" role="tab" data-view="quality">Quality<span class="count">3</span></button>
+  <button class="tab" role="tab" data-view="insights">Insights<span class="count ai">5</span></button>
+  <button class="tab" role="tab" data-view="run">Run</button>
+  <div class="progress"><span>Reviewed <b id="pg-n">5</b> of 12 files</span><div class="cbar"><i id="pg-bar"></i></div><span><b id="pg-f">3</b> of 5 findings classified</span></div>
+</div>
+
+<div class="stalebar" id="stalebar">
+  <strong>Results are out of date</strong>
+  <span><b>Code</b> service.go was edited after the analysis</span>
+  <span><b>Tests</b> last run on e7f3b10</span>
+  <span><b>Insights</b> written for e7f3b10</span>
+  <button class="primary" id="stale-go">Analyze again</button>
+</div>
+
+<main class="overview" id="overview" hidden>
+  <div>
+    <h1>Adds the refund flow</h1>
+    <p class="lead">A new <code>POST /refunds</code> endpoint backed by a new <code>refund</code> package. It loads the payment, validates the amount against what is still refundable, calls the payment gateway and stores the refund. <code>payment.Repo</code> now exposes the refundable balance, and storage gains a refunds table.</p>
+
+    <h2>What the card asks</h2>
+    <div class="ticket">
+      <div class="thead"><h3>Allow refunds for settled payments</h3>
+        <a class="ext" href="#">PAY-482<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 1.5h5v5M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></a>
+        <a class="ext" href="#">PR #318<svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 1.5h5v5M8.5 1.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.3"/></svg></a></div>
+      <p>Support wants to refund a settled payment, in full or in part, without opening a ticket with the provider. A refund must never exceed what was paid, must survive a retry, and finance has to be told about each one.</p>
+      <p class="hint"><em class="t-ai">Model</em> Summarised from the card description and 4 comments.</p>
+    </div>
+
+    <h2>Acceptance criteria<span class="tally">2 met, 2 partly met, 1 not met, 1 without evidence</span><em class="t-ai">Model</em></h2>
+    <ul class="crit">
+      <li><em class="v met">Met</em><div><strong>A settled payment can be refunded in full</strong><span>The scenario "refunds the full amount of a settled payment" passes. <code>refund/service.go:44</code></span></div></li>
+      <li><em class="v met">Met</em><div><strong>A payment that is not settled cannot be refunded</strong><span>Validate returns ErrNotSettled and a test covers it. <code>refund/validate.go:13</code></span></div></li>
+      <li><em class="v part">Partly met</em><div><strong>A partial refund is allowed up to the remaining balance</strong><span>The balance check exists, but no test refunds part of a payment or goes over the limit. <code>refund/validate.go:19</code></span></div></li>
+      <li><em class="v part">Partly met</em><div><strong>Every refund is stored with the gateway reference</strong><span>It is stored, but only after the gateway call; a failed save loses the record. <code>refund/service.go:52</code></span></div></li>
+      <li><em class="v not">Not met</em><div><strong>Sending the same request twice refunds only once</strong><span>The handler reads no idempotency key and nothing detects a repeat. <code>refund/handler.go:31</code></span></div></li>
+      <li><em class="v unk">No evidence</em><div><strong>Finance is notified of each refund</strong><span>Looked in the changed files for an event, a queue write or an outbound call after the refund and found none. This shows it is absent from the diff, not that it is missing everywhere.</span></div></li>
+    </ul>
+
+    <h2>Where to look first</h2>
+    <ol class="look">
+      <li><button data-jump="flow"><span class="rank">1</span><span class="what"><strong>Refund can be paid out and never recorded</strong><span>The gateway is called before the refund is saved, with no compensation if the save fails.</span><span class="tags"><em class="t-ai">Model</em><code>refund/service.go:52</code></span></span><span class="dest">Open in Flow</span></button></li>
+      <li><button data-jump="flow"><span class="rank">2</span><span class="what"><strong>Service.Request is complex and half tested</strong><span>Complexity 11 with 48% of its changed lines covered, CRAP 34.</span><span class="tags"><em class="t-m">Measured</em><code>refund/service.go:44</code></span></span><span class="dest">Open in Flow</span></button></li>
+      <li><button data-jump="diff"><span class="rank">3</span><span class="what"><strong>Partial refund over the limit has no test</strong><span>Coverage shows the over-balance branch of Validate never runs in a test.</span><span class="tags"><em class="t-m">Measured</em><em class="t-ai">Model</em><code>refund/validate.go:19</code></span></span><span class="dest">Open in Diff</span></button></li>
+      <li><button data-jump="diff"><span class="rank">4</span><span class="what"><strong>Repo.Get changed its return type</strong><span>Two callers outside this branch use the old shape.</span><span class="tags"><em class="t-m">Measured</em><code>payment/repo.go:27</code></span></span><span class="dest">Open in Diff</span></button></li>
+    </ol>
+
+    <h2>Left out of the analysis</h2>
+    <ul class="plain">
+      <li>2 changed functions are not reached by any test.</li>
+      <li><code>internal/refund/mock_gateway.go</code> was skipped because it is generated code.</li>
+    </ul>
+  </div>
+
+  <div>
+    <h2 class="first">Since your last review</h2>
+    <div class="sincebox">
+      <p>You reviewed on 12 Nov at <code>a41c9e2</code>. The agent pushed 2 commits after that.</p>
+      <ul class="plain">
+        <li>3 files changed: <code>service.go</code>, <code>validate.go</code>, <code>service_test.go</code></li>
+        <li>2 files you had marked as reviewed were reopened</li>
+        <li>1 of your comments sits on code that changed</li>
+        <li>1 finding you confirmed was touched</li>
+      </ul>
+      <button class="secondary" id="show-since">Show only what changed</button>
+    </div>
+
+    <h2>Measured in this branch</h2>
+    <dl class="score">
+      <dt>Tests</dt><dd><b>41 passing</b>, <b class="bad">1 failing</b><small>9 added in this branch</small></dd>
+      <dt>Coverage of changed lines</dt><dd><b class="warn">67%</b><small>the project target for new code is 80%</small></dd>
+      <dt>Coverage of the whole project</dt><dd><b>80.2%</b><small>81.0% on main, measured the same way</small></dd>
+      <dt>Functions over the complexity limit</dt><dd><b class="warn">2</b><small>both are functions this branch adds</small></dd>
+      <dt>Surviving mutants</dt><dd><b class="warn">9 of 31</b><small>in changed code</small></dd>
+      <dt>Duplicated blocks</dt><dd><b class="ok">0</b></dd>
+    </dl>
+
+    <h2>Shape of the change</h2>
+    <dl class="shape">
+      <dt>Entry points</dt><dd>1 new, 2 affected</dd>
+      <dt>Packages</dt><dd>1 new, 2 modified</dd>
+      <dt>Exported API</dt><dd>1 signature changed</dd>
+      <dt>Database</dt><dd>1 new migration</dd>
+      <dt>Dependencies</dt><dd>None added</dd>
+    </dl>
+  </div>
+</main>
+
+<!-- TESTS -->
+<main class="page" id="tests" hidden>
+  <div class="strip">
+    <div><b>41</b><span>passing</span></div>
+    <div><b class="bad">1</b><span>failing</span></div>
+    <div><b>9</b><span>added in this branch</span></div>
+    <div><b class="warn">67%</b><span>of changed lines covered</span></div>
+    <div><b>1.8 s</b><span>to run</span></div>
+    <div class="ranin">Ran in the sandbox, without network access<button data-go="settings">Change</button></div>
+  </div>
+
+  <div>
+    <h2 class="first">Scenarios, grouped by what they exercise</h2>
+    <div class="tgroup"><code>refund.Service.Request</code><span>2 of 3 passing</span></div>
+    <button class="t"><i class="ok">✓</i><span>refunds the full amount of a settled payment</span><em>new</em><small>3 ms</small></button>
+    <button class="t"><i class="ok">✓</i><span>returns an error when the payment does not exist</span><em>new</em><small>1 ms</small></button>
+    <button class="t on"><i class="bad">✕</i><span>returns an error when the gateway declines</span><em>new</em><small>2 ms</small></button>
+
+    <div class="tgroup"><code>refund.Validate</code><span>3 of 3 passing</span></div>
+    <button class="t"><i class="ok">✓</i><span>accepts an amount up to the refundable balance</span><em>new</em><small>1 ms</small></button>
+    <button class="t"><i class="ok">✓</i><span>rejects a zero or negative amount</span><em>new</em><small>1 ms</small></button>
+    <button class="t"><i class="ok">✓</i><span>rejects a payment that is not settled</span><em>new</em><small>1 ms</small></button>
+
+    <div class="tgroup"><code>refund.Handler.Create</code><span>3 of 3 passing</span></div>
+    <button class="t"><i class="ok">✓</i><span>responds 201 with the refund id</span><em>new</em><small>4 ms</small></button>
+    <button class="t"><i class="ok">✓</i><span>responds 400 on a malformed body</span><em>new</em><small>2 ms</small></button>
+    <button class="t"><i class="ok">✓</i><span>responds 404 when the payment is unknown</span><em>new</em><small>2 ms</small></button>
+
+    <div class="tgroup"><code>payment.Repo.Get</code><span>1 of 1 passing</span></div>
+    <button class="t"><i class="ok">✓</i><span>returns the payment with its refundable balance</span><em class="mod">changed</em><small>12 ms</small></button>
+
+    <button class="more">Show 32 tests in packages this branch did not touch, all passing</button>
+  </div>
+
+  <div>
+    <h2 class="first">Failing scenario</h2>
+    <p class="mono">TestService_Request/gateway_declines</p>
+    <div class="codeblock"><div>--- FAIL: TestService_Request/gateway_declines (0.00s)</div><div class="hl">    service_test.go:88: expected error wrapping ErrDeclined, got nil</div></div>
+    <button class="ghost" data-jump="diff">Open test in Diff</button>
+
+    <h2>Coverage of changed lines, by file</h2>
+    <div class="covs">
+      <code>refund/handler.go</code><div class="cbar"><i style="width:82%"></i></div><span>82%</span>
+      <code>refund/service.go</code><div class="cbar low"><i style="width:48%"></i></div><span>48%</span>
+      <code>refund/validate.go</code><div class="cbar mid"><i style="width:64%"></i></div><span>64%</span>
+      <code>payment/repo.go</code><div class="cbar"><i style="width:90%"></i></div><span>90%</span>
+      <code>storage/refund_repo.go</code><div class="cbar mid"><i style="width:70%"></i></div><span>70%</span>
+    </div>
+
+    <h2>Scenarios nobody wrote <em class="t-ai">Model</em></h2>
+    <ul class="plain">
+      <li>A partial refund above the refundable balance.</li>
+      <li>Saving the refund fails after the gateway accepted it.</li>
+      <li>Two refunds for the same payment arriving at the same time.</li>
+    </ul>
+  </div>
+</main>
+
+<!-- QUALITY -->
+<main class="page" id="quality" hidden>
+  <div>
+    <h2 class="first">Functions changed in this branch</h2>
+    <div class="qt head"><span>Function</span><span>Complexity<small>limit 10</small></span><span>Coverage<small>changed lines</small></span><span>CRAP<small>limit 30</small></span><span>Mutants<small>surviving</small></span></div>
+    <button class="qt on"><code>refund.Service.Request</code><span class="bad">11</span><span class="bad">48%</span><span class="bad">34</span><span class="warn">4 of 9</span></button>
+    <button class="qt"><code>refund.Validate</code><span class="bad">12</span><span class="warn">64%</span><span>21</span><span class="warn">4 of 8</span></button>
+    <button class="qt"><code>refund.Handler.Create</code><span>6</span><span>82%</span><span>7</span><span>1 of 6</span></button>
+    <button class="qt"><code>payment.Repo.Get</code><span>4</span><span>90%</span><span>4</span><span>0 of 5</span></button>
+    <button class="qt"><code>storage.RefundRepo.Save</code><span>3</span><span>70%</span><span>4</span><span>0 of 3</span></button>
+
+    <h2>Surviving mutants in refund.Service.Request</h2>
+    <div class="codeblock"><div>52  ref, err := s.gateway.Refund(ctx, p.ChargeID, amt)</div><div class="hl">53  if err != nil {      mutated to: if err == nil {      no test failed</div><div>54      return fmt.Errorf("gateway refund: %w", err)</div></div>
+    <p class="hint">A mutant survives when the code is changed on purpose and every test still passes. 3 more in this function.</p>
+  </div>
+
+  <div>
+    <h2 class="first">Limits crossed</h2>
+    <ul class="crossed">
+      <li><strong>Service.Request is over the complexity limit</strong><span>11, limit is 10. Combined with 48% coverage it also crosses the CRAP limit.</span></li>
+      <li><strong>Validate is over the complexity limit</strong><span>12, limit is 10.</span></li>
+      <li><strong>refund depends on storage</strong><span><code>internal/refund</code> imports <code>internal/storage</code> directly; the other domain packages only depend on interfaces.</span></li>
+    </ul>
+
+    <h2>Other checks</h2>
+    <dl class="shape">
+      <dt>go vet</dt><dd class="ok">Clean</dd>
+      <dt>staticcheck</dt><dd class="ok">Clean</dd>
+      <dt>Duplicated blocks</dt><dd class="ok">None</dd>
+      <dt>Dependency direction</dt><dd class="bad">1 violation</dd>
+      <dt>Race detector</dt><dd class="ok">No races in tests</dd>
+    </dl>
+  </div>
+</main>
+
+<!-- INSIGHTS -->
+<main class="page" id="insights" hidden>
+  <div>
+    <div class="filters">
+      <div class="seg"><button aria-pressed="true">All 5</button><button aria-pressed="false">High 2</button><button aria-pressed="false">Medium 2</button><button aria-pressed="false">Low 1</button></div>
+      <span class="hint">Read by the model, not measured. Check before trusting.</span>
+    </div>
+    <button class="ins on"><em class="sev high">High</em><span><strong>Refund can be paid out and never recorded</strong><small>Correctness <code>refund/service.go:52</code></small></span></button>
+    <button class="ins"><em class="sev high">High</em><span><strong>Retrying POST /refunds refunds twice</strong><small>Correctness <code>refund/handler.go:31</code></small></span></button>
+    <button class="ins"><em class="sev med">Medium</em><span><strong>Two concurrent refunds can exceed the balance</strong><small>Concurrency <code>payment/repo.go:27</code></small></span></button>
+    <button class="ins"><em class="sev med">Medium</em><span><strong>Partial refund over the limit has no test</strong><small>Tests <code>refund/validate.go:19</code></small></span></button>
+    <button class="ins"><em class="sev low">Low</em><span><strong>Gateway error loses the charge id</strong><small>Observability <code>refund/service.go:54</code></small></span></button>
+  </div>
+
+  <div class="detail">
+    <h1>Refund can be paid out and never recorded</h1>
+    <p class="where mono">internal/refund/service.go:52</p>
+    <p>The gateway refund runs first and the row is saved afterwards. If <code>Save</code> fails, for instance on a database timeout, the customer has the money back and the system has no refund on record. A retry would then refund a second time.</p>
+    <div class="codeblock"><div class="hl">52  ref, err := s.gateway.Refund(ctx, p.ChargeID, amt)</div><div>53  if err != nil {</div><div>54      return fmt.Errorf("gateway refund: %w", err)</div><div>55  }</div><div class="hl">56  return s.refunds.Save(ctx, Refund{PaymentID: id, Ref: ref, Amount: amt})</div></div>
+    <p class="recheck">You confirmed this on 12 Nov. The code around it changed since then, so check it again.</p>
+    <h2>Suggested direction</h2>
+    <p>Save the refund as pending before calling the gateway, then mark it completed or failed with the gateway's answer.</p>
+    <h2>What shows it<span class="tally">read from the code, not reproduced</span></h2>
+    <ul class="plain">
+      <li>Line 52 asks the gateway to refund; line 56 stores the refund only after that.</li>
+      <li>When <code>Save</code> returns an error the function just returns it. No path undoes the refund or records it elsewhere.</li>
+    </ul>
+    <h2>Related, but not proof</h2>
+    <ul class="plain">
+      <li>No test makes <code>Save</code> fail, so this path has never been run.</li>
+    </ul>
+    <div class="actions">
+      <button class="primary">Copy as a prompt for the agent</button>
+      <button class="secondary" data-jump="diff">Open in Diff</button>
+      <div class="seg" id="verdict"><button data-v="pending">Pending</button><button data-v="confirmed">Confirmed</button><button data-v="dismissed">Dismissed</button></div>
+    </div>
+  </div>
+</main>
+
+<!-- RUN -->
+<main class="page" id="run" hidden>
+  <div class="runbar">
+    <button class="primary" id="play">▶ Run this branch</button>
+    <div class="runstate"><strong id="run-title"></strong><span id="run-sub"></span></div>
+    <span class="iso">Docker</span>
+    <button class="ghost" data-go="settings">Run settings</button>
+  </div>
+
+  <div>
+    <h2 class="first">What gets started</h2>
+    <div class="svc"><i></i><code>api</code><span>Built from this branch</span><b></b></div>
+    <div class="svc"><i></i><code>postgres</code><span>Empty database, then migrations and <code>fixtures/dev.sql</code></span><b></b></div>
+    <div class="svc"><i></i><code>gateway</code><span>Stub from <code>docker-compose.dev.yml</code>. The real provider is never called.</span><b></b></div>
+
+    <div class="live">
+      <h2>Requests worth sending <em class="t-ai">Model</em><span class="tally">picked from the acceptance criteria and the findings</span></h2>
+      <div id="rq-list"></div>
+      <div class="rqhead"><span class="verb">POST</span><code>localhost:18080/refunds</code><button class="secondary">Send again</button><button class="ghost">New request</button></div>
+      <div class="codeblock" id="rq-in"></div>
+      <div class="rqhead"><code id="rq-status"></code></div>
+      <div class="codeblock" id="rq-out"></div>
+      <p class="observed" id="rq-says"></p>
+    </div>
+  </div>
+
+  <div class="detail">
+    <div class="idle">
+      <h2 class="first">Before it starts</h2>
+      <ul class="plain">
+        <li>DiffLens checks out <code>e7f3b10</code> into its own copy of the branch and builds from there.</li>
+        <li>Nothing is installed on your machine and your checkout is not touched.</li>
+        <li>Only the API port is published, and only on localhost.</li>
+        <li>Everything is stopped and removed when you press Stop or close the review.</li>
+      </ul>
+    </div>
+    <div class="live">
+      <h2 class="first">Logs</h2>
+      <div class="codeblock logs" id="rq-logs"></div>
+      <h2>Code this request ran <em class="t-m">Measured</em></h2>
+      <ul class="plain" id="rq-ran"></ul>
+      <p class="hint">Measured by building the API with coverage on. It shows what ran, not whether it is right.</p>
+      <div class="actions" style="margin-top:14px"><button class="secondary" data-jump="flow">Open in Flow</button></div>
+    </div>
+  </div>
+</main>
+
+<div class="work" id="review">
+  <aside class="left">
+    <div id="left-flow">
+      <div class="group">Entry points touched</div>
+      <button class="row on"><span class="dot new"></span><span class="name mono">POST /refunds</span><span class="meta">new</span></button>
+      <button class="row"><span class="dot mod"></span><span class="name mono">GET /payments/{id}</span></button>
+      <button class="row"><span class="dot mod"></span><span class="name mono">payment.settled</span><span class="meta">consumer</span></button>
+      <div class="group">Packages changed</div>
+      <button class="row"><span class="name mono">internal/refund</span><span class="meta">7 files</span></button>
+      <button class="row"><span class="name mono">internal/payment</span><span class="meta">3 files</span></button>
+      <button class="row"><span class="name mono">internal/storage</span><span class="meta">2 files</span></button>
+    </div>
+    <div id="left-diff" hidden>
+      <div class="group">internal/refund</div>
+      <button class="row"><span class="dot new"></span><span class="name mono">handler.go</span><span class="meta">+48</span></button>
+      <button class="row on"><span class="dot new"></span><span class="name mono">service.go</span><span class="meta">+62</span></button>
+      <button class="row"><span class="dot new"></span><span class="name mono">validate.go</span><span class="meta">+31</span></button>
+      <button class="row"><span class="dot new"></span><span class="name mono">service_test.go</span><span class="meta">+97</span></button>
+      <div class="group">internal/payment</div>
+      <button class="row"><span class="dot mod"></span><span class="name mono">repo.go</span><span class="meta">+14 −9</span></button>
+      <div class="group">internal/storage</div>
+      <button class="row"><span class="dot mod"></span><span class="name mono">refund_repo.go</span><span class="meta">+22 −4</span></button>
+    </div>
+  </aside>
+
+  <section class="center">
+    <div id="view-flow" style="display:contents">
+      <div class="tools">
+        <div class="seg"><button aria-pressed="true">This branch</button><button aria-pressed="false">Whole app</button></div>
+        <div class="legend"><span><i class="dot new"></i>New</span><span><i class="dot mod"></i>Modified</span><span><i class="dot same"></i>Untouched</span><span><b class="lg-tick">✓</b>Reviewed</span><span><svg width="11" height="11"><circle class="lg-re" cx="5.5" cy="5.5" r="4"/></svg>Changed since your review</span><span>Bar shows coverage of changed lines</span></div>
+        <div class="legend calls-legend">
+          <span><svg width="26" height="8"><path class="lg-e" d="M0 4h26"/></svg>Always called</span>
+          <span><svg width="26" height="8"><path class="lg-e cond" d="M0 4h26"/></svg>Called only on some paths</span>
+          <span><svg width="26" height="8"><path class="lg-e async" d="M0 4h26"/></svg>Asynchronous or event, no order guaranteed</span>
+          <span>Numbers give the position of each call in the caller's code, not the order things run</span>
+        </div>
+      </div>
+      <div class="canvas"><svg id="graph" viewBox="0 0 760 400" preserveAspectRatio="xMidYMin meet"></svg></div>
+    </div>
+    <div id="view-diff" hidden style="display:contents">
+      <div class="tools">
+        <div class="seg" id="diffmode"><button aria-pressed="true" data-mode="changes">Changes only</button><button aria-pressed="false" data-mode="full">Full file</button></div>
+        <div class="seg" id="scope"><button aria-pressed="true" data-scope="branch">Whole branch</button><button aria-pressed="false" data-scope="since">Since last review</button></div>
+        <div class="seg"><button aria-pressed="true">Unified</button><button aria-pressed="false">Side by side</button></div>
+        <span class="hint tip">Click a line to comment</span>
+      </div>
+      <div class="diff changes-only" id="diff"></div>
+    </div>
+  </section>
+
+  <aside class="right">
+    <h2 id="insp-name">refund.Service.Request</h2>
+    <p class="where mono" id="insp-where">internal/refund/service.go:44</p>
+    <p class="says" id="insp-says">Loads the payment, checks the refund amount against what is still refundable, calls the gateway, then stores the refund.</p>
+
+    <div class="sect">
+      <h3>Measured</h3>
+      <dl class="measure" id="insp-measure">
+        <dt>Cyclomatic complexity</dt><dd class="warn">11</dd>
+        <dt>Coverage of changed lines</dt><dd class="bad">48%</dd>
+        <dt>CRAP score</dt><dd class="bad">34</dd>
+        <dt>Tests that reach it</dt><dd>3</dd>
+        <dt>Surviving mutants</dt><dd class="warn">4 of 9</dd>
+      </dl>
+    </div>
+
+    <div class="sect" id="insp-calls">
+      <h3>Calls, by position in the code</h3>
+      <ol class="calls">
+        <li><code>payment.Repo.Get</code><span>Always called</span></li>
+        <li><code>refund.Validate</code><span>Only if the payment was loaded</span></li>
+        <li><code>gateway.Client.Refund</code><span>Only if the amount is valid</span></li>
+        <li><code>storage.RefundRepo.Save</code><span>Only if the gateway accepted the refund</span></li>
+      </ol>
+    </div>
+
+    <div class="sect" id="insp-find">
+      <h3>Model's reading</h3>
+      <div class="finding"><strong>Refund can be paid out and never recorded</strong><p>The gateway is called before the row is saved. If Save fails, the customer is refunded with no record.</p><span class="at mono">service.go:58</span></div>
+      <div class="finding"><strong>No test for a partial refund over the limit</strong><p>Validate has the branch, but no scenario exercises it.</p><span class="at mono">validate.go:19</span></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+
+  // ---- flow graph ----
+  const lanes = ['Entry', 'Service', 'Domain', 'Infrastructure'];
+  const LW = 172, LG = 16, NW = 148, NH = 62, TOP = 34;
+  const lx = i => 12 + i * (LW + LG);
+  const nodes = {
+    h:  { lane:0, y:150, fn:'Handler.Create',  pkg:'refund · POST /refunds', st:'new', add:48, del:0, cov:.82 },
+    s:  { lane:1, y:150, fn:'Service.Request', pkg:'refund',  st:'new', add:62, del:0, cov:.48, sel:true, flag:true },
+    g:  { lane:2, y:24,  fn:'Repo.Get',        pkg:'payment', st:'mod', add:14, del:9, cov:.9 },
+    v:  { lane:2, y:104, fn:'Validate',        pkg:'refund',  st:'new', add:31, del:0, cov:.64, flag:true },
+    sv: { lane:2, y:284, fn:'RefundRepo.Save', pkg:'storage', st:'mod', add:22, del:4, cov:.7 },
+    db: { lane:3, y:50,  fn:'DB.QueryRow',     pkg:'storage', st:'same' },
+    gw: { lane:3, y:194, fn:'Client.Refund',   pkg:'gateway', st:'same' },
+  };
+  // [caller, callee, position of the call in the caller's code, highlighted, condition under which the call is reached]
+  const edges = [['h','s',1,true],['s','g',1,true],['s','v',2,true,'Reached only if the payment was loaded'],
+    ['s','gw',3,true,'Reached only if the amount is valid'],['s','sv',4,true,'Reached only if the gateway accepted the refund'],['g','db',1],['sv','db',1]];
+  const nx = n => lx(n.lane) + (LW - NW) / 2, ny = n => TOP + n.y;
+  let svg = '';
+
+  edges.forEach(([a, b, step, hot, cond]) => {
+    const tip = `<title>${cond || 'Always called when the caller runs'}. Call ${step} in the caller's code.</title>`;
+    const A = nodes[a], B = nodes[b], x1 = nx(A) + NW, y1 = ny(A) + NH / 2, x2 = nx(B), y2 = ny(B) + NH / 2, mx = (x1 + x2) / 2;
+    svg += `<path class="edge ${hot ? 'hot' : ''} ${cond ? 'cond' : ''}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}">${tip}</path>`;
+    svg += `<g class="step ${hot ? 'hot' : ''} ${cond ? 'cond' : ''}">${tip}<circle cx="${x2 - 14}" cy="${y2}" r="8"/><text x="${x2 - 14}" y="${y2 + 3.5}">${step}</text></g>`;
+  });
+  Object.entries(nodes).forEach(([id, n]) => {
+    const x = nx(n), y = ny(n);
+    const cls = n.cov < .5 ? 'low' : n.cov < .75 ? 'mid' : '';
+    svg += `<g class="node ${n.st} ${n.sel ? 'sel' : ''}" data-id="${id}" transform="translate(${x},${y})">
+      <rect class="body" width="${NW}" height="${NH}" rx="7"/><rect class="state" x="0" y="10" width="3" height="${NH - 20}" rx="1.5"/>
+      <text class="fn" x="12" y="20">${n.fn}</text><text class="pkg" x="12" y="36">${n.pkg}</text>
+      ${n.st === 'same' ? '' : `<text x="12" y="53"><tspan class="plus">+${n.add}</tspan><tspan class="minus" dx="6">−${n.del}</tspan></text>
+      <rect class="track" x="78" y="46" width="58" height="4" rx="2"/><rect class="cov ${cls}" x="78" y="46" width="${58 * n.cov}" height="4" rx="2"/>`}
+      ${n.flag ? `<circle class="flag" cx="${NW - 12}" cy="14" r="4"/>` : ''}
+      <g class="tick"><circle cx="${NW - 2}" cy="2" r="8"/><text x="${NW - 2}" y="6">✓</text></g><circle class="reop" cx="${NW - 2}" cy="2" r="7"/>
+    </g>`;
+  });
+  $('#graph').innerHTML = svg;
+
+  // ---- node summary popover ----
+  const info = {
+    h:  { full:'refund.Handler.Create', where:'internal/refund/handler.go:24', m:[6, .82, 7, 3, '1 of 6'],
+          does:'Decodes the request body, calls Service.Request and turns its errors into HTTP status codes.',
+          changed:['New function, the entry point for POST /refunds.', 'Answers 404 for an unknown payment and 400 for a rejected amount.'] },
+    s:  { full:'refund.Service.Request', where:'internal/refund/service.go:44', m:[11, .48, 34, 3, '4 of 9'],
+          does:'Runs a refund from start to finish: loads the payment, validates the amount, calls the gateway and stores the result.',
+          changed:['New function.', 'Calls the gateway before saving the refund.', 'Wraps gateway and lookup errors, returns validation errors as they are.'] },
+    g:  { full:'payment.Repo.Get', where:'internal/payment/repo.go:27', m:[4, .9, 4, 1, '0 of 5'],
+          does:'Reads one payment by id from the database.',
+          changed:['Now also returns the refundable balance, computed from earlier refunds.', 'Return type changed from Payment to PaymentWithBalance.'] },
+    v:  { full:'refund.Validate', where:'internal/refund/validate.go:12', m:[12, .64, 21, 3, '4 of 8'],
+          does:'Decides whether an amount can be refunded for a given payment.',
+          changed:['New function.', 'Rejects payments that are not settled, amounts of zero or less, and amounts above the refundable balance.'] },
+    sv: { full:'storage.RefundRepo.Save', where:'internal/storage/refund_repo.go:18', m:[3, .7, 4, 1, '0 of 3'],
+          does:'Inserts one refund row.',
+          changed:['Writes to the new refunds table.', 'Takes a Refund struct instead of separate arguments.'] },
+    db: { full:'storage.DB.QueryRow', where:'internal/storage/db.go:61',
+          does:'Runs a single-row query on the connection pool.', changed:[], note:'Not changed in this branch. Reached here through Repo.Get and RefundRepo.Save.' },
+    gw: { full:'gateway.Client.Refund', where:'internal/gateway/client.go:102',
+          does:'Calls the payment provider to refund a charge.', changed:[], note:'Not changed in this branch. Service.Request is its first caller.' },
+  };
+  const canvas = $('.canvas'), pop = document.createElement('div');
+  pop.className = 'pop'; pop.hidden = true; canvas.appendChild(pop);
+  const tone = (bad, warn) => bad ? 'bad' : warn ? 'warn' : '';
+  const closePop = () => { pop.hidden = true; $('#graph').classList.remove('focus'); };
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const diffs = {
+    h: [24, [['add', 'func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {'], ['add', '\tvar in createRequest'],
+      ['add', '\tif err := json.NewDecoder(r.Body).Decode(&in); err != nil {'], ['add', '\t\twriteError(w, http.StatusBadRequest, err)'],
+      ['add', '\t\treturn'], ['add', '\t}'], ['add', '\terr := h.svc.Request(r.Context(), in.PaymentID, in.Amount)'],
+      ['add', '\twriteResult(w, err)'], ['add', '}']]],
+    s: [44, [['add', 'func (s *Service) Request(ctx context.Context, id string, amt int64) error {'], ['add', '\tp, err := s.payments.Get(ctx, id)'],
+      ['add', '\tif err != nil {'], ['add', '\t\treturn fmt.Errorf("load payment: %w", err)'], ['add', '\t}'],
+      ['add', '\tif err := Validate(p, amt); err != nil {'], ['add', '\t\treturn err'], ['add', '\t}'],
+      ['add', '\tref, err := s.gateway.Refund(ctx, p.ChargeID, amt)'], ['add', '\tif err != nil {'],
+      ['add', '\t\treturn fmt.Errorf("gateway refund: %w", err)'], ['add', '\t}'],
+      ['add', '\treturn s.refunds.Save(ctx, Refund{PaymentID: id, Ref: ref, Amount: amt})'], ['add', '}']]],
+    g: [27, [['del', 'func (r *Repo) Get(ctx context.Context, id string) (Payment, error) {'],
+      ['add', 'func (r *Repo) Get(ctx context.Context, id string) (PaymentWithBalance, error) {'],
+      ['ctx', '\trow := r.db.QueryRow(ctx, getPayment, id)'], ['del', '\tvar p Payment'],
+      ['del', '\terr := row.Scan(&p.ID, &p.ChargeID, &p.Amount, &p.Status)'], ['add', '\tvar p PaymentWithBalance'],
+      ['add', '\terr := row.Scan(&p.ID, &p.ChargeID, &p.Amount, &p.Status, &p.Refundable)'], ['ctx', '\treturn p, err'], ['ctx', '}']]],
+    v: [12, [['add', 'func Validate(p payment.PaymentWithBalance, amt int64) error {'], ['add', '\tif p.Status != payment.Settled {'],
+      ['add', '\t\treturn ErrNotSettled'], ['add', '\t}'], ['add', '\tif amt <= 0 {'], ['add', '\t\treturn ErrInvalidAmount'], ['add', '\t}'],
+      ['add since', '\tif amt > p.Refundable {'], ['add since', '\t\treturn ErrOverBalance'], ['add since', '\t}'], ['add', '\treturn nil'], ['add', '}']]],
+    sv: [18, [['del', 'func (r *RefundRepo) Save(ctx context.Context, paymentID, ref string) error {'],
+      ['del', '\t_, err := r.db.Exec(ctx, insertRefundLegacy, paymentID, ref)'],
+      ['add', 'func (r *RefundRepo) Save(ctx context.Context, rf Refund) error {'],
+      ['add', '\t_, err := r.db.Exec(ctx, insertRefund, rf.PaymentID, rf.Ref, rf.Amount)'], ['ctx', '\treturn err'], ['ctx', '}']]],
+  };
+  const pathOf = id => info[id].where.replace(/:\d+$/, ''), fileOf = id => pathOf(id).split('/').pop();
+  // Opens the Diff tab on the file that holds the node's function.
+  function openDiff(id) {
+    const n = nodes[id], [start, lines] = diffs[id];
+    let o = start, w = start;
+    const body = lines.map(([t, s]) => L(t, t.startsWith('add') ? '' : o++, t.startsWith('del') ? '' : w++, esc(s))).join('');
+    $('#diff').innerHTML = id === 's' ? d : `<div class="file"><span class="dot ${n.st}"></span><span class="mono">${pathOf(id)}</span>
+      <span class="stat mono"><span class="a">+${n.add}</span> <span class="d">−${n.del}</span></span></div>
+      <div class="fold">${start - 1} unchanged lines hidden</div>${body}`;
+    $$('#left-diff .row').forEach(r => r.classList.toggle('on', $('.name', r).textContent === fileOf(id)));
+    decorateDiff(fileOf(id));
+    show('diff');
+  }
+  function select(id) {
+    const d = info[id];
+    $$('#graph .node').forEach(g => g.classList.toggle('sel', g.dataset.id === id));
+    const n = nodes[id], label = { new:'New', mod:'Modified', same:'Untouched' }[n.st];
+    const stat = n.st === 'same' ? '' : `<span class="stat mono"><span class="a">+${n.add}</span> <span class="d">−${n.del}</span></span>`;
+    pop.innerHTML = `<header>
+        <div class="ptitle"><code>${d.full}</code><button class="x" aria-label="Close">✕</button></div>
+        <div class="pmeta"><span class="dot ${n.st}"></span><span>${label}</span>${stat}<code>${d.where}</code></div>
+      </header>
+      <div class="pbody" data-pane="sum"><p class="plead">${d.does}</p>
+        <h4>What changed in this branch</h4>
+        ${d.changed.length ? `<ul>${d.changed.map(c => `<li>${c}</li>`).join('')}</ul>` : `<p class="quiet">${d.note}</p>`}</div>
+      <footer><span><em class="t-ai">Model</em>summary</span>
+        <span class="pacts">${diffs[id] ? `<button class="markfn">${fnLabel(id)}</button><button class="godiff">View diff of ${fileOf(id)}</button>` : ''}</span></footer>`;
+    pop.hidden = false; $('#graph').classList.add('focus');
+    const r = $(`#graph .node[data-id="${id}"]`).getBoundingClientRect(), c = canvas.getBoundingClientRect();
+    let left = r.right - c.left + canvas.scrollLeft + 18, side = 'right';
+    if (left + pop.offsetWidth > canvas.clientWidth - 8) { left = r.left - c.left + canvas.scrollLeft - pop.offsetWidth - 18; side = 'left'; }
+    const mid = r.top - c.top + canvas.scrollTop + r.height / 2;
+    const top = Math.max(8, Math.min(mid - 40, canvas.clientHeight - 420));
+    pop.style.left = left + 'px'; pop.style.top = top + 'px'; pop.style.setProperty('--caret', (mid - top) + 'px'); pop.dataset.side = side;
+    $('.x', pop).onclick = e => { e.stopPropagation(); closePop(); };
+    if ($('.godiff', pop)) $('.godiff', pop).onclick = () => openDiff(id);
+    if ($('.markfn', pop)) $('.markfn', pop).onclick = e => {
+      reviewedFns.has(id) ? reviewedFns.delete(id) : (reviewedFns.add(id), reopenedFns.delete(id));
+      e.target.textContent = fnLabel(id); paint();
+    };
+    // keep the side panel in step with the selected node
+    $('#insp-name').textContent = d.full; $('#insp-where').textContent = d.where; $('#insp-says').textContent = d.does;
+    $('#insp-measure').parentElement.hidden = !d.m; $('#insp-find').hidden = id !== 's'; $('#insp-calls').hidden = id !== 's';
+    if (d.m) { const [cx, cov, crap, tests, mut] = d.m;
+      $('#insp-measure').innerHTML = `<dt>Cyclomatic complexity</dt><dd class="${tone(cx > 10)}">${cx}</dd>
+        <dt>Coverage of changed lines</dt><dd class="${tone(cov < .5, cov < .75)}">${Math.round(cov * 100)}%</dd>
+        <dt>CRAP score</dt><dd class="${tone(crap > 30)}">${crap}</dd><dt>Tests that reach it</dt><dd>${tests}</dd>
+        <dt>Surviving mutants</dt><dd class="${tone(false, !mut.startsWith('0'))}">${mut}</dd>`; }
+  }
+  $$('#graph .node').forEach(g => g.onclick = e => { e.stopPropagation(); select(g.dataset.id); });
+  pop.onclick = e => e.stopPropagation();
+  canvas.onclick = closePop;
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closePop(); });
+
+  // ---- review progress, re-review and analysis freshness ----
+  const fileNode = { 'handler.go':'h', 'service.go':'s', 'validate.go':'v', 'repo.go':'g', 'refund_repo.go':'sv' };
+  const reviewedFiles = new Set(['handler.go', 'repo.go', 'refund_repo.go']), reopenedFiles = new Set(['service.go', 'validate.go']);
+  const reviewedFns = new Set(['h', 'g', 'sv']), reopenedFns = new Set(['s', 'v']);
+  const fnLabel = id => reviewedFns.has(id) ? '✓ Reviewed' : reopenedFns.has(id) ? 'Mark as reviewed again' : 'Mark as reviewed';
+  function paint() {
+    $$('#left-diff .row').forEach(r => {
+      const f = $('.name', r).textContent, m = $('.mark', r) || r.appendChild(document.createElement('span'));
+      m.className = 'mark' + (reopenedFiles.has(f) ? ' re' : '');
+      m.textContent = reviewedFiles.has(f) ? '✓' : reopenedFiles.has(f) ? 'changed' : '';
+    });
+    $$('#graph .node').forEach(g => {
+      g.classList.toggle('reviewed', reviewedFns.has(g.dataset.id)); g.classList.toggle('reopened', reopenedFns.has(g.dataset.id));
+    });
+    const n = 2 + reviewedFiles.size; // 2 reviewed files live outside the visible tree
+    $('#pg-n').textContent = n; $('#pg-bar').style.width = (n / 12 * 100) + '%';
+  }
+  const oldComment = `<div class="cmt"><div class="who"><b>You</b><span>12 Nov, at a41c9e2</span><em class="old">Code changed since this comment</em></div>
+    <p>Wrap this error. The handler cannot tell a missing payment from a database failure.</p>
+    <div class="acts"><button>Resolve</button><button>Reply</button></div></div>`;
+  function compose(l) {
+    if (l.nextElementSibling && l.nextElementSibling.classList.contains('draft')) return;
+    l.insertAdjacentHTML('afterend', '<div class="cmt draft"><textarea placeholder="Comment on this line"></textarea><div class="acts"><button class="save">Add comment</button><button class="cancel">Cancel</button></div></div>');
+    const box = l.nextElementSibling, ta = $('textarea', box); ta.focus();
+    $('.cancel', box).onclick = () => box.remove();
+    $('.save', box).onclick = () => {
+      const text = ta.value.trim(); if (!text) return;
+      box.className = 'cmt'; box.innerHTML = '<div class="who"><b>You</b><span>just now</span></div><p></p>'; $('p', box).textContent = text;
+    };
+  }
+  // Adds the review button, preserved comments and comment-on-click to whatever file the Diff tab shows.
+  function decorateDiff(file) {
+    const b = document.createElement('button');
+    const set = () => {
+      const done = reviewedFiles.has(file), re = reopenedFiles.has(file);
+      b.className = 'rvbtn' + (done ? ' done' : re ? ' re' : '');
+      b.textContent = done ? '✓ Reviewed' : re ? 'Changed since your review. Mark as reviewed again' : 'Mark as reviewed';
+    };
+    b.onclick = () => { reviewedFiles.has(file) ? reviewedFiles.delete(file) : (reviewedFiles.add(file), reopenedFiles.delete(file)); set(); paint(); };
+    set(); $('#diff .file').appendChild(b);
+    if (file === 'service.go') $$('#diff .ln').find(l => l.children[1].textContent === '48').insertAdjacentHTML('afterend', oldComment);
+    if (!$('#diff .ln.since')) $('#diff').insertAdjacentHTML('beforeend', '<p class="nosince">Nothing in this file changed since your last review.</p>');
+    $$('#diff .ln').forEach(l => l.onclick = () => compose(l));
+  }
+  $$('#left-diff .row').forEach(r => r.onclick = () => { const id = fileNode[$('.name', r).textContent]; if (id) openDiff(id); });
+  $$('#scope button').forEach(b => b.onclick = () => {
+    $$('#scope button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    $('#diff').classList.toggle('since-only', b.dataset.scope === 'since');
+  });
+  $('#show-since').onclick = () => { openDiff('s'); $('#scope [data-scope="since"]').click(); };
+
+  let fresh = false;
+  function analyze() {
+    fresh = true; $('#stalebar').hidden = true; $('#analysis').classList.remove('stale');
+    $('#an-text').innerHTML = 'Analyzed your working tree at <code>e7f3b10</code>, just now'; $('#an-flag').textContent = 'Up to date';
+  }
+  $('#reanalyze').onclick = analyze; $('#stale-go').onclick = analyze;
+
+  const verdicts = ['confirmed', 'pending', 'pending', 'confirmed', 'dismissed'];
+  const verdictName = { confirmed:'Confirmed', pending:'Pending', dismissed:'Dismissed' };
+  function paintVerdicts() {
+    $$('#insights .ins').forEach((r, i) => {
+      const m = $('.st', r) || r.appendChild(document.createElement('em'));
+      m.className = 'st ' + verdicts[i]; m.textContent = verdictName[verdicts[i]]; r.classList.toggle('gone', verdicts[i] === 'dismissed');
+    });
+    $$('#verdict button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === verdicts[0]));
+    $('#pg-f').textContent = verdicts.filter(v => v !== 'pending').length;
+  }
+  $$('#verdict button').forEach(b => b.onclick = () => { verdicts[0] = b.dataset.v; paintVerdicts(); });
+  paint(); paintVerdicts();
+
+  // ---- diff ----
+  const L = (t, o, n, s) => `<div class="ln ${t}"><i>${o || ''}</i><i>${n || ''}</i><span>${s}</span></div>`;
+  const far = [
+    [38, 'type Service struct {'], [39, '\tpayments PaymentReader'], [40, '\tgateway  Gateway'], [41, '\trefunds  Store'], [42, '}'], [43, ''],
+  ];
+  let d = `<div class="file"><span class="dot new"></span><span class="mono">internal/refund/service.go</span><span class="stat mono"><span class="a">+62</span> <span class="d">−0</span></span></div>`;
+  d += `<div class="fold">37 unchanged lines hidden</div>`;
+  far.forEach(([n, s]) => d += L('far', n, n, s));
+  d += [
+    ['add', '', 44, 'func (s *Service) Request(ctx context.Context, id string, amt int64) error {'],
+    ['add', '', 45, '\tp, err := s.payments.Get(ctx, id)'],
+    ['add since', '', 46, '\tif err != nil {'],
+    ['add since', '', 47, '\t\treturn fmt.Errorf("load payment: %w", err)'],
+    ['add since', '', 48, '\t}'],
+    ['add', '', 49, '\tif err := Validate(p, amt); err != nil {'],
+    ['add', '', 50, '\t\treturn err'],
+    ['add', '', 51, '\t}'],
+    ['add', '', 52, '\tref, err := s.gateway.Refund(ctx, p.ChargeID, amt)'],
+  ].map(a => L(...a)).join('');
+  d += `<div class="finding note"><strong>Refund can be paid out and never recorded</strong><p>The gateway is called here, before the row is saved below.</p></div>`;
+  d += [
+    ['add', '', 53, '\tif err != nil {'],
+    ['add', '', 54, '\t\treturn fmt.Errorf("gateway refund: %w", err)'],
+    ['add', '', 55, '\t}'],
+    ['add', '', 56, '\treturn s.refunds.Save(ctx, Refund{PaymentID: id, Ref: ref, Amount: amt})'],
+    ['add', '', 57, '}'],
+  ].map(a => L(...a)).join('');
+  $('#diff').innerHTML = d;
+  decorateDiff('service.go');
+
+  // ---- run the branch ----
+  const lines = (el, text, hl) => el.innerHTML = text.split('\n').map(s => `<div class="${hl && hl(s) ? 'hl' : ''}">${esc(s)}</div>`).join('');
+  const boot = '12:04:01 postgres  database system is ready to accept connections\n12:04:02 api       migrations applied: 0007_refunds\n12:04:02 api       listening on :8080';
+  const reqs = [
+    { name:'Refund a settled payment in full', from:'Acceptance criterion 1', bad:false, seen:'As asked',
+      body:'{ "payment_id": "pay_1042", "amount": 12900 }', status:'201 Created in 38 ms',
+      out:'{ "id": "rf_7781", "status": "completed" }', says:'Behaves as the criterion asks.',
+      log:'12:04:19 api       POST /refunds 201 38ms payment=pay_1042',
+      ran:['Handler.Create', 'Service.Request', 'Repo.Get', 'Validate', 'Client.Refund, answered by the stub', 'RefundRepo.Save'] },
+    { name:'Send the same refund twice', from:'Finding: retrying POST /refunds refunds twice', bad:true, seen:'Reproduced',
+      body:'Idempotency-Key: 7c1e9a\n{ "payment_id": "pay_2001", "amount": 4000 }', status:'201 Created, then 201 Created again',
+      out:'{ "id": "rf_7782", "status": "completed" }\n{ "id": "rf_7783", "status": "completed" }',
+      says:'Reproduced: the same request refunded the payment twice. The finding had only been read from the code; now it has been observed.',
+      log:'12:05:02 api       POST /refunds 201 31ms payment=pay_2001\n12:05:03 api       POST /refunds 201 29ms payment=pay_2001',
+      ran:['Handler.Create', 'Service.Request', 'Repo.Get', 'Validate', 'Client.Refund, answered by the stub', 'RefundRepo.Save'] },
+    { name:'Partial refund above the balance', from:'Scenario nobody wrote', bad:false, seen:'As asked',
+      body:'{ "payment_id": "pay_1042", "amount": 99900 }', status:'422 Unprocessable Entity in 9 ms',
+      out:'{ "error": "amount exceeds refundable balance" }', says:'Rejected as the criterion asks. There is still no automated test for it.',
+      log:'12:05:40 api       POST /refunds 422 9ms payment=pay_1042 err="amount exceeds refundable balance"',
+      ran:['Handler.Create', 'Service.Request', 'Repo.Get', 'Validate'] },
+  ];
+  $('#rq-list').innerHTML = reqs.map(r => `<button class="rq"><span><strong>${r.name}</strong><small>${r.from}</small></span><em class="${r.bad ? 'bad' : ''}">${r.seen}</em></button>`).join('');
+  function showReq(i) {
+    const r = reqs[i];
+    $$('#rq-list .rq').forEach((b, k) => b.classList.toggle('on', k === i));
+    lines($('#rq-in'), r.body); lines($('#rq-out'), r.out); lines($('#rq-logs'), boot + '\n' + r.log, s => s.includes('POST'));
+    $('#rq-status').textContent = r.status; $('#rq-says').textContent = r.says; $('#rq-says').classList.toggle('bad', r.bad);
+    $('#rq-ran').innerHTML = r.ran.map(f => `<li><code>${f.split(',')[0]}</code>${f.includes(',') ? f.slice(f.indexOf(',')) : ''}</li>`).join('');
+  }
+  $$('#rq-list .rq').forEach((b, i) => b.onclick = () => showReq(i));
+  let up = false;
+  function paintRun() {
+    $('#run').classList.toggle('up', up);
+    $('#play').textContent = up ? '■ Stop' : '▶ Run this branch'; $('#play').classList.toggle('stop', up);
+    $('#run-title').textContent = up ? 'Running on localhost:18080' : 'Not running';
+    $('#run-sub').innerHTML = up ? 'Built from <code>feat/refund-flow</code> at <code>e7f3b10</code>. 3 containers, started 1 min ago.'
+      : 'Starts the API from <code>feat/refund-flow</code> at <code>e7f3b10</code> with its own database, so you can call it.';
+    $$('#run .svc b').forEach(b => b.textContent = up ? 'Healthy' : 'Stopped');
+  }
+  $('#play').onclick = () => { up = !up; paintRun(); };
+  paintRun(); showReq(1);
+  // Each kind of project defines what an entry point is, what Run starts and how you exercise it.
+  const kinds = [
+    { name:'Backend API', sub:'HTTP or gRPC', detected:true,
+      icon:'<path d="M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4"/>',
+      entry:'Routes and RPC methods', run:'Starts the service with its database and stubs for what it calls',
+      use:'You send requests and read the response, the logs and the code that ran', title:'Running the application',
+      fields:[['Start with', 'docker compose -f docker-compose.dev.yml up --build'], ['Ready when', 'GET /healthz answers 200'],
+        ['Port', '8080 in the container, published on localhost:18080'], ['Environment', '.env.example'], ['Seed data', 'fixtures/dev.sql']] },
+    { name:'Frontend', sub:'Pages in a browser',
+      icon:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M6.5 6.5h.01"/>',
+      entry:'Pages and routes', run:'Starts the dev server and opens the app in a preview next to the same page on the base branch',
+      use:'You click through the changed pages and compare them with how they were', title:'Running the application',
+      fields:[['Start with', 'npm run dev'], ['Ready when', 'the port answers'], ['Port', '5173, published on localhost:15173'],
+        ['API it talks to', 'recorded answers from fixtures/api'], ['Environment', '.env.example']] },
+    { name:'Worker', sub:'Consumes a queue',
+      icon:'<rect x="12" y="6" width="9" height="12" rx="2"/><path d="M2 12h7M6 9l3 3-3 3"/>',
+      entry:'Message handlers, one per queue or topic', run:'Starts the worker with a local broker and an empty database',
+      use:'You publish a message and see what the worker wrote, published and logged', title:'Running the worker',
+      fields:[['Start with', 'docker compose -f docker-compose.dev.yml up worker'], ['Ready when', 'the log says "consumer started"'],
+        ['Broker', 'rabbitmq, from the compose file'], ['Queues', 'payment.settled, refund.requested'], ['Sample messages', 'fixtures/messages/']] },
+    { name:'Producer', sub:'Publishes or scheduled',
+      icon:'<rect x="3" y="6" width="9" height="12" rx="2"/><path d="M15 12h7M19 9l3 3-3 3"/>',
+      entry:'Schedules and triggers', run:'Starts it with a local broker that only records what arrives',
+      use:'You fire one run by hand and inspect every message it published', title:'Running the producer',
+      fields:[['Start with', 'docker compose -f docker-compose.dev.yml up scheduler'], ['Trigger', 'run the job once, ignoring its schedule'],
+        ['Broker', 'rabbitmq, from the compose file'], ['Topics recorded', 'all'], ['Seed data', 'fixtures/dev.sql']] },
+    { name:'CLI', sub:'Terminal command',
+      icon:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 10l3 2.5L7 15M12.5 15H17"/>',
+      entry:'Commands and subcommands', run:'Builds the binary of this branch and the one of the base branch',
+      use:'You run a command in a terminal and compare output, exit code and files written with the base branch', title:'Running a command',
+      fields:[['Build with', 'go build ./cmd/payctl'], ['Example command', 'payctl refund --payment pay_1042 --amount 12900'],
+        ['Working directory', 'an empty temporary folder'], ['Environment', '.env.example']] },
+    { name:'Library', sub:'Imported by code',
+      icon:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/>',
+      entry:'Exported functions and types', run:'Nothing stays up. The Run tab is replaced by the examples in the package',
+      use:'You run the example functions and see what changed in the exported API', title:'Running the examples',
+      fields:[['Examples', 'Example functions in *_test.go'], ['Compatibility check', 'compare the exported API with the base branch']] },
+  ];
+  $('#kinds').innerHTML = kinds.map((k, i) => `<button class="kind" aria-pressed="${i === 0}"><svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true">${k.icon}</svg>
+    <strong>${k.name}</strong><small>${k.sub}</small>${k.detected ? '<em>Detected</em>' : ''}</button>`).join('');
+  function paintKind() {
+    const k = kinds[$$('#kinds .kind').findIndex(b => b.getAttribute('aria-pressed') === 'true')];
+    $('#kind-says').innerHTML = `<dt>Entry points in Flow</dt><dd>${k.entry}</dd><dt>What Run starts</dt><dd>${k.run}</dd><dt>How you try it</dt><dd>${k.use}</dd>`;
+    $('#kind-title').textContent = k.title;
+    $('#kind-form').innerHTML = k.fields.map(([a, b]) => `<dt>${a}</dt><dd>${esc(b)}</dd>`).join('');
+    $('#kind-hint').innerHTML = k.detected ? 'Detected from <code>docker-compose.dev.yml</code> and the <code>Makefile</code>. Your own <code>.env</code> is never copied into a run.'
+      : 'Not what DiffLens detected for this project. These are the defaults for this kind; edit them to match.';
+  }
+  paintKind();
+  $('#kinds').addEventListener('click', () => setTimeout(paintKind));
+  // Every settings screen has its own save bar, enabled once a choice differs from what was saved.
+  $$('.savebar').forEach(bar => {
+    const root = bar.parentElement, btns = () => $$('.pick button', root), picks = () => btns().map(b => b.getAttribute('aria-pressed')), saved = picks();
+    const state = $('span', bar), discard = $('.secondary', bar), save = $('.primary', bar);
+    const set = (dirty, text) => { save.disabled = discard.disabled = !dirty; state.textContent = text; };
+    $$('.pick', root).forEach(s => $$('button', s).forEach(b => b.onclick = () => {
+      $$('button', s).forEach(x => x.setAttribute('aria-pressed', x === b));
+      const dirty = picks().some((v, i) => v !== saved[i]); set(dirty, dirty ? 'Unsaved changes' : 'No changes');
+    }));
+    save.onclick = () => { saved.splice(0, saved.length, ...picks()); set(false, bar.dataset.saved); };
+    discard.onclick = () => { btns().forEach((b, i) => b.setAttribute('aria-pressed', saved[i])); paintKind(); paintModel(); set(false, 'No changes'); };
+  });
+  function paintModel() { const cli = $('#model-pick button').getAttribute('aria-pressed') === 'true'; $('#model-cli').hidden = !cli; $('#model-api').hidden = cli; }
+  $('#model-pick').addEventListener('click', () => setTimeout(paintModel)); paintModel();
+  $('#clone-open').onclick = () => $('#clonebox').hidden = !$('#clonebox').hidden;
+
+  // ---- navigation ----
+  const pages = ['overview', 'tests', 'quality', 'insights', 'run'];
+  let view = 'overview';
+  function show(v) {
+    view = v;
+    $$('.tab').forEach(x => x.setAttribute('aria-selected', x.dataset.view === v));
+    pages.forEach(p => $('#' + p).hidden = v !== p); $('#review').hidden = pages.includes(v);
+    const flow = v === 'flow';
+    $('#view-flow').hidden = !flow; $('#left-flow').hidden = !flow;
+    $('#view-diff').hidden = v !== 'diff'; $('#left-diff').hidden = v !== 'diff';
+    if (flow && !show.opened) { show.opened = true; select('s'); }
+  }
+  function go(screen) {
+    const review = screen === 'review';
+    ['projects', 'project', 'settings', 'app'].forEach(s => $('#' + s).hidden = screen !== s); $('#tabs').hidden = !review;
+    $$('.pj').forEach(e => e.hidden = screen === 'projects' || screen === 'app');
+    $$('.rv').forEach(e => e.hidden = !review); $('#stalebar').hidden = !review || fresh;
+    if (review) show(view); else { pages.forEach(p => $('#' + p).hidden = true); $('#review').hidden = true; }
+  }
+  $$('[data-go]').forEach(b => b.onclick = () => go(b.dataset.go));
+  $$('.tab[data-view]').forEach(t => t.onclick = () => show(t.dataset.view));
+  $$('[data-jump]').forEach(b => b.onclick = () => show(b.dataset.jump));
+  show(view);
+  $$('#diffmode button').forEach(b => b.onclick = () => {
+    $$('#diffmode button').forEach(x => x.setAttribute('aria-pressed', x === b));
+    $('#diff').classList.toggle('changes-only', b.dataset.mode === 'changes');
+  });
+  $('#theme').onclick = e => {
+    const r = document.documentElement, dark = r.dataset.theme === 'dark';
+    r.dataset.theme = dark ? 'light' : 'dark'; e.target.textContent = dark ? 'Dark theme' : 'Light theme';
+  };
+</script>
+</body>
+</html>

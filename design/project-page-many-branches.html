@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>DiffLens mockup: project page with many branches</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root[data-theme="dark"] {
+    --bg:#151925; --panel:#1a1f2e; --raised:#232a3d; --line:#2c344c; --text:#e7e9f2; --muted:#8d96ae; --faint:#5c6580;
+    --accent:#7ea6ff; --accent-soft:rgba(126,166,255,.14); --add:#56cf97; --del:#f27d72; --mod:#e9b85c;
+  }
+  :root[data-theme="light"] {
+    --bg:#eceff5; --panel:#f7f8fb; --raised:#ffffff; --line:#d8ddea; --text:#1b2132; --muted:#5d6780; --faint:#98a1b7;
+    --accent:#2f5fd8; --accent-soft:rgba(47,95,216,.10); --add:#12855a; --del:#c8402f; --mod:#a06c08;
+  }
+  * { box-sizing:border-box; margin:0; scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
+  html, body { height:100%; }
+  body { font:13px/1.45 "IBM Plex Sans", system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden; }
+  code, .mono { font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:12px; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .bar { display:flex; align-items:center; gap:14px; height:46px; padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line); flex:none; }
+  .logo { display:flex; align-items:center; gap:8px; font-weight:600; }
+  .crumb { display:flex; align-items:center; gap:8px; color:var(--muted); } .crumb b { color:var(--text); font-weight:500; padding:4px 8px; }
+  .spacer { flex:1; }
+  .ghost { padding:5px 10px; border:1px solid var(--line); border-radius:6px; color:var(--muted); } .ghost:hover { color:var(--text); border-color:var(--faint); }
+  .secondary { padding:8px 14px; border-radius:7px; border:1px solid var(--line); background:var(--raised); }
+
+  main { flex:1; overflow:auto; padding:40px max(24px, calc(50% - 480px)) 60px; }
+  .back { color:var(--muted); margin:-16px 0 14px -2px; display:block; } .back:hover { color:var(--text); }
+  .phead { display:flex; align-items:start; gap:16px; } .phead > div { flex:1; }
+  h1 { font-size:22px; font-weight:600; letter-spacing:-.02em; }
+  .sub { color:var(--muted); margin-top:4px; }
+  h2 { display:flex; align-items:baseline; gap:8px; font-size:13px; font-weight:500; color:var(--muted); margin:30px 0 10px; }
+  h2 small { font-size:12px; font-weight:400; color:var(--faint); }
+
+  .find { display:flex; align-items:center; gap:12px; margin-top:24px; }
+  .find input { flex:1; padding:8px 12px; border:1px solid var(--line); border-radius:7px; background:var(--panel); color:var(--text); font:inherit; }
+  .find input::placeholder { color:var(--faint); }
+  .seg { display:inline-flex; padding:2px; border-radius:7px; background:var(--panel); border:1px solid var(--line); }
+  .seg button { padding:5px 11px; border-radius:5px; color:var(--muted); white-space:nowrap; }
+  .seg button[aria-pressed="true"] { background:var(--raised); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  .how { color:var(--faint); font-size:12px; margin-top:10px; }
+
+  .list { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel); }
+  .r { display:grid; grid-template-columns:minmax(0,1.5fr) 84px 150px 78px 170px 62px; gap:14px; align-items:center; width:100%; text-align:left; padding:11px 16px; border-top:1px solid var(--line); }
+  .r:first-child { border-top:0; } .r:hover { background:var(--raised); }
+  .r .name { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; gap:8px; }
+  .r .name span { overflow:hidden; text-overflow:ellipsis; }
+  .card { color:var(--accent); font-size:12px; }
+  .base { justify-self:start; display:inline-flex; align-items:center; gap:5px; padding:1px 8px; border:1px solid var(--line); border-radius:10px; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .base code { color:var(--text); font-size:11.5px; } .base i { font-style:normal; color:var(--faint); font-size:9px; }
+  .base:hover { border-color:var(--faint); }
+  .num, .when { color:var(--muted); font-size:12px; white-space:nowrap; } .when { text-align:right; }
+  .stat { color:var(--muted); white-space:nowrap; } .stat .a { color:var(--add); } .stat .d { color:var(--del); }
+  .tag { font-size:11px; padding:0 7px; border-radius:9px; border:1px solid var(--accent); color:var(--accent); font-weight:400; flex:none; }
+  .tag.pr { border-color:var(--line); color:var(--muted); }
+  .r.old { opacity:.7; }
+  .more { width:100%; text-align:left; padding:11px 16px; color:var(--muted); border-top:1px solid var(--line); } .more:hover { color:var(--text); background:var(--raised); }
+  .none { padding:18px 16px; color:var(--muted); }
+  .wt { display:flex; align-items:center; gap:10px; padding:11px 16px; border-top:1px solid var(--line); color:var(--muted); }
+  .wt b { color:var(--mod); font-weight:500; } .wt button { margin-left:auto; color:var(--accent); }
+
+  .integ { display:flex; align-items:center; gap:10px; padding:12px 16px; border:1px solid var(--line); border-radius:10px; color:var(--muted); }
+  .integ code { color:var(--text); padding:1px 8px; border:1px solid var(--line); border-radius:10px; }
+  .integ button { margin-left:auto; color:var(--accent); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="logo">
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="none" stroke="var(--accent)" stroke-width="1.8"/><path d="M5.5 8.5h6M8.5 5.5v6" stroke="var(--add)" stroke-width="1.6" stroke-linecap="round"/><path d="M13 13l5 5" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/></svg>
+    DiffLens
+  </div>
+  <nav class="crumb"><b>Projects</b><span>/</span><b>acme-api</b></nav>
+  <div class="spacer"></div>
+  <button class="ghost" id="theme">Light theme</button>
+</header>
+
+<main>
+  <button class="back">← All projects</button>
+  <div class="phead">
+    <div><h1>acme-api</h1><p class="sub"><code>~/code/acme-api</code> · Go · 43 branches</p></div>
+    <button class="secondary">Project settings</button>
+  </div>
+
+  <div class="find">
+    <input id="q" type="search" placeholder="Filter by branch or card, such as ABC-123" aria-label="Filter branches">
+    <div class="seg" id="where"><button aria-pressed="true">On this machine</button><button aria-pressed="false">Also on the remote</button></div>
+  </div>
+  <p class="how">Each branch is compared with its own base: the target of its open pull request, or else the closest integration branch in its history. Click a base to change it.</p>
+
+  <h2>Checked out</h2>
+  <div class="list" id="current"></div>
+
+  <h2>Active <small>committed to in the last 14 days, or with an open pull request</small></h2>
+  <div class="list" id="active"></div>
+
+  <h2>Older</h2>
+  <div class="list" id="older"></div>
+
+  <h2>Integration branches <small>used as bases, never listed for review</small></h2>
+  <div class="integ"><code>develop</code><code>master</code><code>release/*</code><button>Change in Project settings</button></div>
+</main>
+
+<script>
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  // [branch, card, base, how the base was chosen, commits, files, additions, deletions, date, pull request, only on the remote]
+  const current = [['feature/ABC-178', 'ABC-178', 'develop', 'PR #42', 6, 14, 412, 38, '16 Nov', 'PR #42']];
+  const active = [
+    ['feature/ABC-176', 'ABC-176', 'develop', 'PR #40', 4, 9, 233, 17, '16 Nov', 'PR #40'],
+    ['hotfix/ABC-181', 'ABC-181', 'master', 'PR #43', 1, 2, 18, 6, '15 Nov', 'PR #43'],
+    ['feature/ABC-170', 'ABC-170', 'develop', 'closest in history', 11, 31, 1204, 96, '12 Nov', ''],
+    ['docs/readme-examples', '', 'develop', 'closest in history', 3, 5, 342, 0, '11 Nov', ''],
+    ['feature/ABC-143', 'ABC-143', 'develop', 'closest in history', 7, 12, 286, 74, '9 Nov', ''],
+    ['feature/ABC-125', 'ABC-125', 'develop', 'closest in history', 2, 3, 41, 12, '6 Nov', ''],
+    ['feature/ABC-184', 'ABC-184', 'develop', 'PR #45', 5, 8, 190, 22, '16 Nov', 'PR #45', true],
+  ];
+  const older = [
+    ['feature/ABC-121', 'ABC-121', 'develop', 'closest in history', 9, 22, 815, 44, '30 Oct', ''],
+    ['feature/ABC-101', 'ABC-101', 'develop', 'closest in history', 6, 17, 502, 91, '28 Oct', ''],
+    ['feature/ABC-77', 'ABC-77', 'release/2.4', 'closest in history', 3, 4, 77, 12, '14 Oct', ''],
+    ['spike/token-cache', '', 'develop', 'closest in history', 14, 26, 1460, 310, '2 Oct', ''],
+  ];
+  const OLDER_TOTAL = 35;
+  const row = ([b, card, base, how, commits, files, add, del, when, pr, remote], cls = '') => `<button class="r ${cls}" data-text="${(b + ' ' + card).toLowerCase()}" ${remote ? 'data-remote' : ''}>
+      <span class="name mono"><span>${b}</span>${pr ? `<em class="tag pr" style="font-style:normal">${pr}</em>` : ''}${remote ? '<em class="tag pr" style="font-style:normal">remote only</em>' : ''}</span>
+      <span class="card mono">${card}</span>
+      <span class="base" title="Base chosen from: ${how}">into <code>${base}</code><i>▼</i></span>
+      <span class="num">${commits} commit${commits > 1 ? 's' : ''}</span>
+      <span class="stat mono">${files} files <span class="a">+${add}</span> <span class="d">−${del}</span></span>
+      <span class="when">${when}</span></button>`;
+
+  let showOlder = false, remote = false;
+  function paint() {
+    const q = $('#q').value.trim().toLowerCase(), hit = r => (!q || (r[0] + ' ' + r[1]).toLowerCase().includes(q)) && (remote || !r[10]);
+    const cur = current.filter(hit), act = active.filter(hit), old = older.filter(hit);
+    $('#current').innerHTML = (cur.map(r => row(r)).join('') || '<p class="none">The checked out branch does not match the filter.</p>')
+      + '<div class="wt"><b>3 files</b> changed in your working tree and not committed yet<button>Review them</button></div>';
+    $('#active').innerHTML = act.map(r => row(r)).join('') || '<p class="none">No active branch matches.</p>';
+    // A filter searches every branch, so matching older ones are shown without the extra click.
+    const open = showOlder || q;
+    $('#older').innerHTML = open
+      ? (old.map(r => row(r, 'old')).join('') || '<p class="none">No older branch matches.</p>') + (q ? '' : `<button class="more" id="less">Hide older branches</button>`)
+      : `<button class="more" id="showold" style="border-top:0">Show ${OLDER_TOTAL} older branches</button>`;
+    if ($('#showold')) $('#showold').onclick = () => { showOlder = true; paint(); };
+    if ($('#less')) $('#less').onclick = () => { showOlder = false; paint(); };
+  }
+  $('#q').oninput = paint;
+  $$('#where button').forEach((b, i) => b.onclick = () => { remote = i === 1; $$('#where button').forEach(x => x.setAttribute('aria-pressed', x === b)); paint(); });
+  $('#theme').onclick = e => {
+    const r = document.documentElement, dark = r.dataset.theme === 'dark';
+    r.dataset.theme = dark ? 'light' : 'dark'; e.target.textContent = dark ? 'Dark theme' : 'Light theme';
+  };
+  paint();
+</script>
+</body>
+</html>

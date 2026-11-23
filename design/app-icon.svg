@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>DiffLens</title>
+  <!-- macOS icon grid: 824x824 square centred on a 1024 canvas; corner radius 185 with
+       60% corner smoothing to approximate Apple's continuous (squircle) corners -->
+  <path fill="#052e35" d="M628 100 c103.61 0 155.41 0 194.99 20.16 a185 185 0 0 1 80.85 80.85 c20.16 39.57 20.16 91.38 20.16 194.99 V628 c0 103.61 0 155.41 -20.16 194.99 a185 185 0 0 1 -80.85 80.85 c-39.57 20.16 -91.38 20.16 -194.99 20.16 H396 c-103.61 0 -155.41 0 -194.99 -20.16 a185 185 0 0 1 -80.85 -80.85 c-20.16 -39.57 -20.16 -91.38 -20.16 -194.99 V396 c0 -103.61 0 -155.41 20.16 -194.99 a185 185 0 0 1 80.85 -80.85 c39.57 -20.16 91.38 -20.16 194.99 -20.16 Z"/>
+
+  <!-- Magnifier: lens centred at (497, 497) so lens + handle sit centred in the square -->
+  <g fill="none" stroke="#fce7cc" stroke-linecap="round">
+    <circle cx="497" cy="497" r="243" stroke-width="51"/>
+    <line x1="677.31" y1="677.31" x2="763.15" y2="763.15" stroke-width="65"/>
+  </g>
+
+  <!-- Removed line -->
+  <rect x="332" y="391" width="330" height="92" rx="46" fill="#f65751"/>
+  <line x1="389" y1="437" x2="491" y2="437" stroke="#052e35" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- Added line -->
+  <rect x="332" y="511" width="330" height="92" rx="46" fill="#54d8a3"/>
+  <path d="M555 557 H605 M580 532 V582" stroke="#052e35" stroke-width="24" stroke-linecap="round"/>
+</svg>
