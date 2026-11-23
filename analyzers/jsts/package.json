@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "DiffLens analyzer for JavaScript and TypeScript source trees",
+  "license": "MIT",
   "type": "module",
   "main": "src/main.js",
   "engines": {

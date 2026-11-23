@@ -2,6 +2,7 @@
 name = "difflens-analyzer-rust"
 version = "0.0.0"
 description = "DiffLens analyzer for Rust source trees"
+license = "MIT"
 edition = "2021"
 publish = false
 
