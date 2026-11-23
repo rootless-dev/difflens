@@ -18,7 +18,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Parses Rust source into a syntax tree; `full` covers items and bodies,
 # `visit` walks them.
-syn = { version = "2", features = ["full", "visit"] }
+syn = { version = "3", features = ["full", "visit"] }
 
 # Its own workspace: never part of an enclosing one (src-tauri, or a folder
 # the environment is built in).
