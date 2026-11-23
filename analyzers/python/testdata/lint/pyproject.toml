@@ -1,0 +1,17 @@
+[project]
+name = "lint-sample"
+version = "0.1.0"
+requires-python = ">=3.9"
+
+[dependency-groups]
+lint = ["ruff==0.14.0", "mypy==1.18.2"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "B"]
+
+[tool.mypy]
+strict = false
+warn_return_any = true

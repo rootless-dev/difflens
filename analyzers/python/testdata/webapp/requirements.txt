@@ -1,0 +1,5 @@
+fastapi==0.115.0
+flask==3.0.3
+django==5.1.1
+celery==5.4.0
+typer==0.12.5

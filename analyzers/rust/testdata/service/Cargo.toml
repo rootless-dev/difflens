@@ -1,0 +1,13 @@
+# Analysed only: its dependencies are never fetched or built.
+[package]
+name = "service"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+actix-web = "4"
+axum = "0.7"
+clap = { version = "4", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }

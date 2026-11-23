@@ -1,0 +1,12 @@
+{
+  "name": "mocha-proj",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "c8 mocha"
+  },
+  "devDependencies": {
+    "c8": "^10.1.0",
+    "mocha": "^11.0.0"
+  }
+}

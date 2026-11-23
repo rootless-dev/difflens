@@ -1,0 +1,12 @@
+[package]
+name = "failing"
+version = "0.1.0"
+edition = "2021"
+
+# Its own workspace, so it is never taken for a member of the analyzer's.
+[workspace]
+
+# A test binary of its own: judged by its exit status.
+[[test]]
+name = "custom"
+harness = false

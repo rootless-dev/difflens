@@ -1,0 +1,9 @@
+[project]
+name = "shapes"
+version = "1.0.0"
+requires-python = ">=3.9"
+dependencies = ["click>=8"]
+
+[project.scripts]
+shapes = "shapes.cli:main"
+shapes-admin = "shapes.cli:cli"

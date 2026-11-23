@@ -1,0 +1,3 @@
+# The repository ignores every dist/ folder; this fixture's build output is
+# part of the test data (it checks that build output is never analysed).
+!/testdata/jsproj/dist/

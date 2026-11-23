@@ -1,0 +1,4 @@
+# Runtime dependencies of the Python analyzer, installed into its own virtual
+# environment the first time a Python project needs it (never into the user's
+# project). Pin exact versions (name==version). Nothing listed: the analyzer
+# uses the standard library only (ast), and installing is skipped.

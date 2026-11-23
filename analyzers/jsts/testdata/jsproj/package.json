@@ -1,0 +1,9 @@
+{
+  "name": "democli",
+  "version": "0.1.0",
+  "bin": { "democli": "bin/cli.js" },
+  "main": "lib/index.js",
+  "dependencies": {
+    "commander": "^12.0.0"
+  }
+}

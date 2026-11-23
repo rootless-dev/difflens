@@ -1,0 +1,24 @@
+[package]
+name = "difflens-analyzer-rust"
+version = "0.0.0"
+description = "DiffLens analyzer for Rust source trees"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "difflens-analyzer-rust"
+path = "src/main.rs"
+
+[dependencies]
+# Already syn's dependency; `span-locations` gives every token its line,
+# which the analysis reports (no new crate).
+proc-macro2 = { version = "1", features = ["span-locations"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Parses Rust source into a syntax tree; `full` covers items and bodies,
+# `visit` walks them.
+syn = { version = "2", features = ["full", "visit"] }
+
+# Its own workspace: never part of an enclosing one (src-tauri, or a folder
+# the environment is built in).
+[workspace]

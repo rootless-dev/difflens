@@ -1,0 +1,17 @@
+{
+  "name": "difflens-analyzer-jsts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DiffLens analyzer for JavaScript and TypeScript source trees",
+  "type": "module",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "typescript": "6.0.3"
+  }
+}

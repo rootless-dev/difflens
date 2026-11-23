@@ -1,0 +1,7 @@
+[package]
+name = "ledger-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ledger-core = { path = "../ledger-core" }
