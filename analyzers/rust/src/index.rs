@@ -1330,7 +1330,7 @@ impl<'a> Builder<'a> {
         let trait_path = implementation
             .trait_
             .as_ref()
-            .map(|(_, path, _)| segments(path));
+            .map(|(path, _)| segments(path));
         self.index.impls.push(ImplDef {
             module,
             self_ty: &implementation.self_ty,

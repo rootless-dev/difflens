@@ -70,10 +70,11 @@ impl<'ast> Visit<'ast> for Counter {
     }
 
     fn visit_arm(&mut self, node: &'ast syn::Arm) {
-        if !catch_all(&node.pat) {
+        let (pattern, guard) = source::arm_pattern(node);
+        if !catch_all(pattern) {
             self.count += 1;
         }
-        if node.guard.is_some() {
+        if guard.is_some() {
             self.count += 1;
         }
         syn::visit::visit_arm(self, node);
@@ -127,6 +128,11 @@ mod tests {
         assert_eq!(
             complexity("match v { 1 => a(), 2 if ok => b(), _ => c() }"),
             4
+        );
+        // A guarded catch-all counts its guard only.
+        assert_eq!(
+            complexity("match v { 1 => a(), _ if ok => b(), _ => c() }"),
+            3
         );
         assert_eq!(
             complexity("match v { None => a(), Some(x) => b(), other => c() }"),

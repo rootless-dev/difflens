@@ -215,6 +215,11 @@ mod tests {
         assert_eq!(functions["shapes::Circle::new"].complexity, Some(1));
         // if, else if, &&, ?
         assert_eq!(functions["shapes::geometry::classify"].complexity, Some(5));
+        // A guarded arm, its guard, and the catch-all that adds nothing.
+        assert_eq!(
+            functions["shapes::geometry::clamp_size"].complexity,
+            Some(3)
+        );
     }
 
     #[test]
@@ -284,6 +289,15 @@ mod tests {
         assert!(has_call(
             &analysis,
             "shapes::geometry::classify",
+            "shapes::geometry::scaled",
+            "conditional",
+            "static",
+            "call"
+        ));
+        // A call in a match guard, which only some arms reach.
+        assert!(has_call(
+            &analysis,
+            "shapes::geometry::clamp_size",
             "shapes::geometry::scaled",
             "conditional",
             "static",

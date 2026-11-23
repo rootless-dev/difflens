@@ -52,6 +52,13 @@ pub fn classify(text: &str) -> Result<&'static str, std::num::ParseFloatError> {
     }
 }
 
+pub fn clamp_size(size: Option<f64>) -> f64 {
+    match size {
+        Some(side) if side > scaled(1.0, 2.0) => side,
+        _ => 0.0,
+    }
+}
+
 pub fn area_in_background(circle: Circle) -> f64 {
     let handle = thread::spawn(move || circle.area());
     handle.join().unwrap_or(0.0)

@@ -1572,12 +1572,13 @@ impl<'v, 'w, 'a> Visit<'v> for Walker<'w, 'a> {
         let conditional = node.arms.len() > 1;
         let clap = self.frameworks().clap;
         for arm in &node.arms {
+            let (pattern, guard) = source::arm_pattern(arm);
             let saved = self.cli.clone();
             if clap {
-                if let Some(label) = self.cli_label(&arm.pat, builder) {
+                if let Some(label) = self.cli_label(pattern, builder) {
                     let mut sites = Vec::new();
                     dispatch_calls(&arm.body, &mut sites);
-                    self.cli = Some((label, source::line(arm.pat.span()), sites));
+                    self.cli = Some((label, source::line(pattern.span()), sites));
                 }
             }
             if conditional {
@@ -1585,8 +1586,8 @@ impl<'v, 'w, 'a> Visit<'v> for Walker<'w, 'a> {
             }
             self.locals.push(HashMap::new());
             self.bind_pattern(
-                &arm.pat,
-                match &arm.pat {
+                pattern,
+                match pattern {
                     Pat::Ident(_) => scrutinee.clone(),
                     _ => match &scrutinee {
                         Ty::Wrapped(_) => scrutinee.clone(),
@@ -1594,7 +1595,7 @@ impl<'v, 'w, 'a> Visit<'v> for Walker<'w, 'a> {
                     },
                 },
             );
-            if let Some((_, guard)) = &arm.guard {
+            if let Some(guard) = guard {
                 self.visit_expr(guard);
             }
             self.visit_expr(&arm.body);
