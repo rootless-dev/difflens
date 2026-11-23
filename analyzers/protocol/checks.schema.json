@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://difflens.dev/analyzers/protocol/checks.schema.json",
+  "title": "DiffLens language analyzer static checks output, protocol version 1",
+  "description": "`<analyzer> check --dir <tree> --timeout <duration> [--cache-dir <folder>]` runs the language's static checkers on one source tree (for Go: go vet, and staticcheck when it is installed) and prints exactly one JSON document matching this schema on stdout, exiting 0 whenever it could report. For an analyzer whose checkers need the project's dependencies, the core first runs `prepare` on a throwaway copy of the tree and checks that copy, so the dependencies are installed (see tests.schema.json); otherwise --dir is a tree shared by other readers. Checkers read the code; a checker that executes project code (ESLint loading its configuration, clippy running build scripts and proc macros) runs in a sandbox of the analyzer's own, with the network off and writes only to a temporary folder and --cache-dir. They must not write inside --dir. --cache-dir is the same per-project folder test runs get, kept between runs (see tests.schema.json); an analyzer with nothing worth keeping there ignores it. A checker that is not installed is reported as unavailable, not as a failure. Logs go to stderr; a non-zero exit means the analyzer itself failed.",
+  "type": "object",
+  "required": ["protocol", "language", "runner", "checks", "diagnostics"],
+  "additionalProperties": false,
+  "properties": {
+    "protocol": { "const": 1 },
+    "language": { "type": "string" },
+    "runner": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": { "name": { "type": "string" }, "version": { "type": "string" } }
+    },
+    "checks": {
+      "description": "One entry per checker the language has, installed or not, in a fixed order.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tool", "status", "message", "findings"],
+        "additionalProperties": false,
+        "properties": {
+          "tool": { "description": "Name a developer knows it by, such as \"go vet\" or \"staticcheck\".", "type": "string" },
+          "status": {
+            "description": "clean: ran, found nothing. findings: ran and reported problems. unavailable: not installed. failed: could not run (the code does not compile, a crash); message says why.",
+            "enum": ["clean", "findings", "unavailable", "failed"]
+          },
+          "message": { "description": "For unavailable and failed: why, in one line. Null otherwise.", "type": ["string", "null"] },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["file", "line", "message", "rule", "severity"],
+              "additionalProperties": false,
+              "properties": {
+                "file": { "description": "Relative to --dir, with \"/\" separators.", "type": "string" },
+                "line": { "type": "integer", "minimum": 1 },
+                "message": { "description": "The checker's own words, without a severity prefix such as \"warning: \".", "type": "string" },
+                "rule": { "description": "The checker's own code for it, such as \"SA4006\" or \"printf\", or null.", "type": ["string", "null"] },
+                "severity": {
+                  "description": "The checker's own level for it, mapped: error for what the checker reports as an error (a type error, a lint set to deny, go vet's reports), warning for warnings, info for notes, hints and suggestions. Analyzers always write it; the core reads a document without it (kept from before it existed) as warning.",
+                  "enum": ["error", "warning", "info"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnostics": { "type": "array", "items": { "type": "string" } }
+  }
+}

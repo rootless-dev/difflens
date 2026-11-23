@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://difflens.dev/analyzers/protocol/analysis.schema.json",
+  "title": "DiffLens language analyzer output, protocol version 1",
+  "description": "Every language analyzer is an executable invoked as `<analyzer> analyze --dir <source tree>` that prints exactly one JSON document matching this schema on stdout and exits 0. It analyses one side (one commit's source tree) of a review; the core runs it on both sides and works out what changed by itself. Logs go to stderr. A non-zero exit means the analysis failed and stderr explains why. The analyzer must not write inside --dir and must not need network access beyond what the language's own toolchain does to resolve dependencies.",
+  "type": "object",
+  "required": ["protocol", "language", "analyzer", "functions", "calls", "diagnostics"],
+  "additionalProperties": false,
+  "properties": {
+    "protocol": { "const": 1 },
+    "language": {
+      "description": "Language id in lowercase, the same ids the core uses for project detection, such as \"go\".",
+      "type": "string"
+    },
+    "analyzer": {
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "functions": {
+      "description": "Every function, method and closure worth showing that is defined in the source tree (not in dependencies). Generated files may be included and are flagged.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/function" }
+    },
+    "calls": {
+      "description": "Call sites inside the functions listed above. A callee outside the source tree (standard library, dependencies) is listed in `externals` instead of `functions`.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/call" }
+    },
+    "externals": {
+      "description": "Callees defined outside the source tree that are called from it, so the graph can show them as boundary nodes.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/external" }
+    },
+    "diagnostics": {
+      "description": "Problems that did not stop the analysis, such as a package that failed to type-check. Shown to the user as they are.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["level", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "level": { "enum": ["warning", "error"] },
+          "message": { "type": "string" },
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "function": {
+      "type": "object",
+      "required": ["id", "name", "qualifiedName", "container", "file", "startLine", "endLine", "generated", "test"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Stable identity of the function across commits: the same function in the old and the new side must get the same id even if it moved within its file or its body changed. For Go: the import path, the receiver type if any, and the name, such as \"example.com/payments/internal/refund.(*Service).Request\". Closures append their position among the enclosing function's closures, such as \"...Request$1\".",
+          "type": "string"
+        },
+        "name": { "description": "Short display name, such as \"Service.Request\".", "type": "string" },
+        "qualifiedName": { "description": "Name a developer would recognise, such as \"refund.Service.Request\".", "type": "string" },
+        "container": { "description": "Package, module or namespace, such as \"internal/refund\".", "type": "string" },
+        "file": { "description": "Path relative to --dir, with \"/\" separators.", "type": "string" },
+        "startLine": { "type": "integer", "minimum": 1 },
+        "endLine": { "type": "integer", "minimum": 1 },
+        "generated": { "type": "boolean" },
+        "test": {
+          "description": "Defined in test code by the language's own convention (for Go: a _test.go file), including helpers and closures there, not only test entry points.",
+          "type": "boolean"
+        },
+        "complexity": {
+          "description": "Cyclomatic complexity of the body, 1 for a body with no branches. Omitted when the analyzer cannot compute it.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "entryPoints": {
+          "description": "Ways this function is reached from outside the program. Empty or omitted when it is not an entry point.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/entryPoint" }
+        }
+      }
+    },
+    "entryPoint": {
+      "type": "object",
+      "required": ["kind", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["http_route", "rpc_method", "message_handler", "scheduled_job", "cli_command", "main", "test", "exported_api"] },
+        "label": { "description": "What a developer would call it, such as \"POST /refunds\", \"payment.settled\" or \"payctl refund\".", "type": "string" },
+        "file": { "description": "Where it is registered, if that is not the function itself.", "type": "string" },
+        "line": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "call": {
+      "type": "object",
+      "required": ["caller", "callee", "line", "kind", "resolution", "relation"],
+      "additionalProperties": false,
+      "properties": {
+        "caller": { "description": "Function id.", "type": "string" },
+        "callee": { "description": "Function id, or external id.", "type": "string" },
+        "line": { "description": "Line of the call site in the caller's file.", "type": "integer", "minimum": 1 },
+        "kind": {
+          "description": "always: reached on every path through the caller that returns normally. conditional: reached only on some paths. async: started without waiting for it (a goroutine, a callback registered for later, a message sent).",
+          "enum": ["always", "conditional", "async"]
+        },
+        "resolution": {
+          "description": "static: the callee is known from the code. dynamic: an interface or function-value call, resolved to every possible target; each target gets its own call entry.",
+          "enum": ["static", "dynamic"]
+        },
+        "relation": {
+          "description": "call: the caller invokes the callee. registration: the caller hands the callee to a mechanism the analyzer recognises, which will invoke it later (an HTTP route, a middleware, a message handler, a CLI command); `evidence` says which. reference: the caller passes the callee as a value (an argument, a field, a variable) with no known meaning; it may or may not be invoked. For registration and reference, `kind` is \"async\" and `resolution` is \"static\".",
+          "enum": ["call", "registration", "reference"]
+        },
+        "evidence": {
+          "description": "For registration: what the registration is, as a developer would read it, such as \"route POST /refunds\" or \"middleware\". Omitted otherwise.",
+          "type": "string"
+        }
+      }
+    },
+    "external": {
+      "type": "object",
+      "required": ["id", "name", "container"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "container": { "description": "Package or module, such as \"database/sql\".", "type": "string" }
+      }
+    }
+  }
+}

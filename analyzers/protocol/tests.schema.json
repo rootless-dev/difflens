@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://difflens.dev/analyzers/protocol/tests.schema.json",
+  "title": "DiffLens language analyzer test run output, protocol version 1",
+  "description": "A language analyzer that can run tests offers two more commands besides `analyze`. `<analyzer> prepare --dir <tree> [--cache-dir <folder>] [--tools <folder>]` (--tools: also install the mutation engine into that folder when missing, see mutation.schema.json) fetches what the tests will need (for Go: the module dependencies) so the run itself can be offline; it must not execute project code, may use the network, and on success exits 0 and prints one JSON document matching $defs/prepare on stdout: the toolchain's own directories the test step must be able to write (for Go: the build cache), which the core opens in the sandbox besides the run's own copy. The core also runs it before `check` for an analyzer whose checkers need the dependencies (see checks.schema.json); prepare may then run for two copies of one project at the same time, so whatever it shares between trees must be safe to build concurrently. --cache-dir, given to prepare, test and check, is a folder of the core outside the tree, one per project and analyzer, kept between runs (deleted when it grows too large and when the project is removed from DiffLens), for the build output worth keeping from one run to the next (for Rust: CARGO_TARGET_DIR); the core opens it in the sandbox. Each run's tree is a fresh copy at another path, so what is kept there must stay correct when the same relative files hold other code, and an analyzer with nothing worth keeping ignores the flag. `<analyzer> test --dir <tree> --timeout <duration> [--cache-dir <folder>] [--offline] [--no-race] [--no-cover] [--selection <file>] [--progress <file>]` runs the project's unit tests once and prints exactly one JSON document matching this schema on stdout, exiting 0 whenever it could report (failing tests are not a failed run). It runs every test of the tree, or with --selection only those the file names ($defs/selection), with coverage of all the project's own code unless --no-cover, and the race detector unless --no-race. A partial run reports only the packages and tests it ran. With --progress, it keeps that file up to date while it runs ($defs/progress), replacing it whole each time; the file may be missing until the first packages are listed. --offline means there is no network: the runner must not try to fetch anything (for Go: GOPROXY=off and GONOPROXY=none, the checksum database left on so the toolchain go switches to is accepted from what prepare cached, with -mod=mod for a module, -mod=readonly for a go.work workspace and -mod=vendor for a vendored module). Tests may write inside --dir: the core always gives the runner a throwaway copy. Logs go to stderr. A non-zero exit means the runner itself failed and stderr explains why. Tests selected only by build tags (for Go: integration tests behind a tag) are not run.",
+  "type": "object",
+  "required": ["protocol", "language", "runner", "race", "tests", "packages", "coverage", "races", "diagnostics"],
+  "additionalProperties": false,
+  "properties": {
+    "protocol": { "const": 1 },
+    "language": { "description": "Same language id as the analyze command, such as \"go\".", "type": "string" },
+    "runner": {
+      "description": "Name and version of the analyzer acting as runner.",
+      "type": "object",
+      "required": ["name", "version"],
+      "additionalProperties": false,
+      "properties": { "name": { "type": "string" }, "version": { "type": "string" } }
+    },
+    "race": {
+      "description": "The race detector was on for this run. False when --no-race was given or the toolchain cannot use it (for Go: no cgo); a diagnostic says which.",
+      "type": "boolean"
+    },
+    "tests": {
+      "description": "Every test and subtest that ran or was skipped, in the order they finished. A subtest is listed on its own and its parent too.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/test" }
+    },
+    "packages": {
+      "description": "Every package, module or namespace of the project, with its overall outcome (no_tests for one without tests).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/package" }
+    },
+    "coverage": {
+      "description": "Statement coverage of the project's own code over the whole run, or null when it could not be measured (a diagnostic says why).",
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/coverage" }]
+    },
+    "races": {
+      "description": "Data races the race detector reported. Empty when there were none or the detector was off.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/race" }
+    },
+    "diagnostics": {
+      "description": "Problems that did not stop the run, shown to the user as they are.",
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "prepare": {
+      "description": "Output of the prepare command.",
+      "type": "object",
+      "required": ["protocol", "writable"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol": { "const": 1 },
+        "writable": {
+          "description": "Absolute paths of directories the test step writes to outside --dir, such as the Go build cache. Never the module or dependency cache, which the test step only reads.",
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "required": ["container", "package", "name", "hierarchy", "function", "file", "line", "outcome", "durationMs", "output", "command"],
+      "additionalProperties": false,
+      "properties": {
+        "container": {
+          "description": "Package, module or namespace of the test, written exactly as the analyze command writes `container` for the test function.",
+          "type": "string"
+        },
+        "package": {
+          "description": "Container of the package the test ran in, exactly as `packages` lists it; a selection names packages this way. It differs from `container` for a test whose function the analyze command lists elsewhere (for Go: an external test package at the root of a module).",
+          "type": "string"
+        },
+        "name": {
+          "description": "Full name as the test framework prints it, subtests included, such as \"TestService_Request/gateway_declines\".",
+          "type": "string"
+        },
+        "hierarchy": {
+          "description": "Where `name` nests: the name of each level, from the top-level test down to this one, such that joining them with \"/\" gives `name` exactly. A top-level test has one level, whatever its name holds (a Rust doc test \"src/lib.rs - add (line 5)\", a pytest case \"test_url[a/b]\"); a subtest has its ancestors before it (Go: [\"TestService_Request\", \"gateway_declines\"]). The core reads subtests from it, never by splitting `name`. Analyzers always write it; the core reads a test without it (kept from before it existed) as `name` split at every \"/\".",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "command": {
+          "description": "A shell command a developer runs from the root of --dir to run this test again on its own, as the runner ran it (for Go: \"go test -race -run '^TestA$/^b$' ./internal/refund\"; for Rust: \"cargo test -p shapes --lib -- geometry::tests::area --exact\"), with the race detector when this run had it; null when there is no such command. Shown and copied by the Tests tab.",
+          "type": ["string", "null"]
+        },
+        "function": {
+          "description": "Id of the test function that defines this test (for a subtest, the top-level test function), exactly as the analyze command writes function ids, so the core can find it in the call graph. Null when the runner cannot tell.",
+          "type": ["string", "null"]
+        },
+        "file": { "description": "Path of that function's file relative to --dir, with \"/\" separators, or null.", "type": ["string", "null"] },
+        "line": { "description": "Line where that function starts, or null.", "type": ["integer", "null"], "minimum": 1 },
+        "outcome": { "enum": ["pass", "fail", "skip"] },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "output": {
+          "description": "For a failed test: what it printed, its subtests' output included, at most 64 KiB (the end is kept). Null otherwise.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "package": {
+      "type": "object",
+      "required": ["container", "outcome", "durationMs", "output", "command"],
+      "additionalProperties": false,
+      "properties": {
+        "container": { "type": "string" },
+        "outcome": {
+          "description": "pass: every test passed or was skipped. fail: a test failed, or the package failed outside any test (a panic in setup, a timeout). build_failed: the package or its tests do not compile. no_tests: it compiled and has no tests.",
+          "enum": ["pass", "fail", "build_failed", "no_tests"]
+        },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "output": {
+          "description": "For build_failed, or for fail when no single test explains it: the compiler or framework output, at most 64 KiB. Null otherwise.",
+          "type": ["string", "null"]
+        },
+        "command": {
+          "description": "A shell command a developer runs from the root of --dir to run this package's tests on their own, as the runner ran them (for Go: \"go test -race ./internal/refund\"), or null when there is none.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["blocks"],
+      "additionalProperties": false,
+      "properties": {
+        "blocks": {
+          "description": "Blocks of statements of the project's own code (not tests, not generated files) with how many times they ran. Together they say which lines hold statements and which of them ran. A line is coverable when a block spans it, and covered when a block spanning it has count > 0.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "startLine", "endLine", "statements", "count"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "description": "Relative to --dir, with \"/\" separators.", "type": "string" },
+              "startLine": { "type": "integer", "minimum": 1 },
+              "endLine": { "type": "integer", "minimum": 1 },
+              "statements": { "type": "integer", "minimum": 0 },
+              "count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "race": {
+      "type": "object",
+      "required": ["container", "test", "output"],
+      "additionalProperties": false,
+      "properties": {
+        "container": { "type": "string" },
+        "test": { "description": "Full name of the test during which it was reported, or null.", "type": ["string", "null"] },
+        "output": { "description": "The detector's report, at most 16 KiB.", "type": "string" }
+      }
+    },
+    "selection": {
+      "description": "The file given to --selection: what a partial run runs. A package selected with tests runs only those; a test selected with subtests runs only those (for Go: one go test per package, and one more per test with only some subtests, since -run cannot give each test its own subtest pattern). Packages are named by the container `packages` lists them with; one not found is said in a diagnostic.",
+      "type": "object",
+      "required": ["packages"],
+      "additionalProperties": false,
+      "properties": {
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["package", "tests"],
+            "additionalProperties": false,
+            "properties": {
+              "package": { "type": "string" },
+              "tests": {
+                "description": "Top-level tests to run, or null for the whole package.",
+                "oneOf": [
+                  { "type": "null" },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["name", "subtests"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": { "description": "Top-level name, as `name` prints it.", "type": "string" },
+                        "subtests": {
+                          "description": "Subtests to run, named relative to the test as the framework prints them (\"gateway_declines\"); null for the whole test. A nested subtest (\"a/b\") runs its first-level ancestor.",
+                          "oneOf": [{ "type": "null" }, { "type": "array", "items": { "type": "string" } }]
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "progress": {
+      "description": "The file kept up to date with --progress.",
+      "type": "object",
+      "required": ["protocol", "packagesDone", "packagesTotal", "tests", "failed", "current"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol": { "const": 1 },
+        "packagesDone": { "description": "Package results reported so far (for a partial run, one per go test of a package).", "type": "integer", "minimum": 0 },
+        "packagesTotal": { "description": "Package results the run will report, as far as it knows.", "type": "integer", "minimum": 0 },
+        "tests": { "description": "Top-level tests finished so far.", "type": "integer", "minimum": 0 },
+        "failed": { "description": "Of those, the ones that failed.", "type": "integer", "minimum": 0 },
+        "current": { "description": "Container of a package running now, or null.", "type": ["string", "null"] }
+      }
+    }
+  }
+}
