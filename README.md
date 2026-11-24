@@ -35,6 +35,27 @@ called only when you click; nothing runs on its own.
 - **Interface.** It is available in English and Brazilian Portuguese. Tokens
   and API keys are kept in the macOS Keychain.
 
+## Screenshots
+
+The screenshots come from a review of a small demo shop API written in Go.
+
+**Overview:** what the change does, measured signals, and where to look first.
+
+![Overview of a review](docs/screenshots/overview.png)
+
+**Flow:** the changed functions and how they call each other, starting from
+the entry points the branch touches.
+
+![Flow of the changed functions](docs/screenshots/flow.png)
+
+**A project:** its branches to review, each compared with its base.
+
+![A project and its branches](docs/screenshots/project.png)
+
+**Projects:** the repositories DiffLens knows on this machine.
+
+![The projects screen](docs/screenshots/projects.png)
+
 ## Install
 
 Download the disk image for your Mac from the
